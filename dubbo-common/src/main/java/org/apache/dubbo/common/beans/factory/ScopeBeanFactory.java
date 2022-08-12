@@ -44,11 +44,16 @@ public class ScopeBeanFactory {
 
     protected static final Logger LOGGER = LoggerFactory.getLogger(ScopeBeanFactory.class);
 
+    //bean工厂也是多层级
     private final ScopeBeanFactory parent;
+    //拥有对拓展的获取能力
     private ExtensionAccessor extensionAccessor;
+    // 拓展的后处理器
     private List<ExtensionPostProcessor> extensionPostProcessors;
     private Map<Class, AtomicInteger> beanNameIdCounterMap = new ConcurrentHashMap<>();
+    // bean缓存
     private List<BeanInfo> registeredBeanInfos = new CopyOnWriteArrayList<>();
+    //实例创建策略
     private InstantiationStrategy instantiationStrategy;
     private AtomicBoolean destroyed = new AtomicBoolean();
 
@@ -86,10 +91,12 @@ public class ScopeBeanFactory {
             throw new ScopeBeanException("already exists bean with same name and type, name=" + name + ", type=" + clazz.getName());
         }
         try {
+            //反射创建实例
             instance = instantiationStrategy.instantiate(clazz);
         } catch (Throwable e) {
             throw new ScopeBeanException("create bean instance failed, type=" + clazz.getName(), e);
         }
+        //保存在本地缓存中, 以便后续使用
         registerBean(name, instance);
         return instance;
     }
@@ -119,12 +126,14 @@ public class ScopeBeanFactory {
     }
 
     public <T> T getOrRegisterBean(String name, Class<T> type) {
+        //在本层级以及父级工厂, 根据类型名称获取bean
         T bean = getBean(name, type);
         if (bean == null) {
             // lock by type
             synchronized (type) {
                 bean = getBean(name, type);
                 if (bean == null) {
+                    //本层级工厂反射创建bean, 并缓存到本地
                     bean = createAndRegisterBean(name, type);
                 }
             }
@@ -189,8 +198,10 @@ public class ScopeBeanFactory {
     }
 
     public <T> T getBean(String name, Class<T> type) {
+        //根据名称和类型获取bean
         T bean = getBeanInternal(name, type);
         if (bean == null && parent != null) {
+            //本层级工厂内获取不到递归父工厂获取, 是在获取不到 返回null
             return parent.getBean(name, type);
         }
         return bean;
@@ -207,6 +218,7 @@ public class ScopeBeanFactory {
         for (BeanInfo beanInfo : registeredBeanInfos) {
             // if required bean type is same class/superclass/interface of the registered bean
             if (type.isAssignableFrom(beanInfo.instance.getClass())) {
+                // 类型匹配成功&&名称匹配成功直接返回
                 if (StringUtils.isEquals(beanInfo.name, name)) {
                     return (T) beanInfo.instance;
                 } else {
@@ -226,6 +238,7 @@ public class ScopeBeanFactory {
 
         // if bean name not matched and only single candidate
         if (candidates != null) {
+            // 类型匹配成功&&名称匹配不成功, 如果找到一个直接返回, 如果找到多个类型相同的实例直接抛错
             if (candidates.size() == 1) {
                 return (T) candidates.get(0).instance;
             } else if (candidates.size() > 1) {

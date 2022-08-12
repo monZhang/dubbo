@@ -24,6 +24,7 @@ public class ZookeeperServiceDiscoveryFactory extends AbstractServiceDiscoveryFa
 
     @Override
     protected ServiceDiscovery createDiscovery(URL registryURL) {
+        //新建服务发现组件
         return new ZookeeperServiceDiscovery(applicationModel, registryURL);
     }
 }

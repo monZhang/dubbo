@@ -30,11 +30,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p></p>
  * <p>ExtensionDirector supports multiple levels, and the child can inherit the parent's extension instances. </p>
  * <p>The way to find and create an extension instance is similar to Java classloader.</p>
+ *
+ *
+ * ExtensionLoader的管理工具, 通过该工具完成对extensionLoader的创建, 对拓展实例的获取
  */
 public class ExtensionDirector implements ExtensionAccessor {
 
+    //spi接口class --- extensionLoader  缓存
+    //spi接口class --- ExtensionScope   缓存
     private final ConcurrentMap<Class<?>, ExtensionLoader<?>> extensionLoadersMap = new ConcurrentHashMap<>(64);
     private final ConcurrentMap<Class<?>, ExtensionScope> extensionScopeMap = new ConcurrentHashMap<>(64);
+    // 父级节点, 通过该属性将多个 ExtensionDirector 串联起来
     private final ExtensionDirector parent;
     private final ExtensionScope scope;
     private final List<ExtensionPostProcessor> extensionPostProcessors = new ArrayList<>();
@@ -82,6 +88,7 @@ public class ExtensionDirector implements ExtensionAccessor {
 
         ExtensionScope scope = extensionScopeMap.get(type);
         if (scope == null) {
+            //从spi注解获取 extensionScope 并缓存
             SPI annotation = type.getAnnotation(SPI.class);
             scope = annotation.scope();
             extensionScopeMap.put(type, scope);
@@ -89,10 +96,14 @@ public class ExtensionDirector implements ExtensionAccessor {
 
         if (loader == null && scope == ExtensionScope.SELF) {
             // create an instance in self scope
+            // 针对self scope级别的拓展直接新建一个 extensionLoader
             loader = createExtensionLoader0(type);
         }
 
         // 2. find in parent
+        // 递归访问父节点, 从父节点获取 extensionLoader
+        // 第一次调用时, 递归到最顶级节点后loader 还是获取不到
+        // 继续走后续方法创建
         if (loader == null) {
             if (this.parent != null) {
                 loader = this.parent.getExtensionLoader(type);
@@ -101,6 +112,8 @@ public class ExtensionDirector implements ExtensionAccessor {
 
         // 3. create it
         if (loader == null) {
+            //从最顶级节点尝试创建, 如果scope不匹配
+            //递归退出 逐渐降低使用下层 ExtensionDirector尝试创建.
             loader = createExtensionLoader(type);
         }
 

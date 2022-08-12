@@ -64,6 +64,7 @@ public abstract class AbstractMetadataReportFactory implements MetadataReportFac
             }
             boolean check = url.getParameter(CHECK_KEY, true) && url.getPort() != 0;
             try {
+                //创建元数据上报组件
                 metadataReport = createMetadataReport(url);
             } catch (Exception e) {
                 if (!check) {

@@ -655,6 +655,7 @@ public abstract class AbstractConfig implements Serializable {
             List<Map<String, String>> configurationMaps = environment.getConfigurationMaps();
 
             // Search props starts with PREFIX in order
+            //拼接dubbo.service 前缀
             String preferredPrefix = null;
             for (String prefix : getPrefixes()) {
                 if (ConfigurationUtils.hasSubProperties(configurationMaps, prefix)) {
@@ -685,6 +686,7 @@ public abstract class AbstractConfig implements Serializable {
                     "], extracted props: " + subProperties);
             }
 
+            //将各个配置类中的属性按照set方法分配到当前配置类 this 中
             assignProperties(this, environment, subProperties, subPropsConfiguration);
 
             // process extra refresh of subclass, e.g. refresh method configs
@@ -711,10 +713,13 @@ public abstract class AbstractConfig implements Serializable {
         Method[] methodsList = this.getClass().getDeclaredMethods();
         for (Method method : methods) {
             if (MethodUtils.isSetter(method)) {
+                //setXxx(A a)情况
+                //根据方法名提炼出配置名称 (移除set前缀第一个字母转小写)
                 String propertyName = extractPropertyName(method.getName());
 
                 // if config mode is OVERRIDE_IF_ABSENT and property has set, skip
                 if (overrideIfAbsent && isPropertySet(methodsList, propertyName)) {
+                    //已经设置了值直接跳过
                     continue;
                 }
 
@@ -728,7 +733,10 @@ public abstract class AbstractConfig implements Serializable {
                         && ClassUtils.isTypeMatch(method.getParameterTypes()[0], value)
                         && !isIgnoredAttribute(obj.getClass(), propertyName)) {
                         value = environment.resolvePlaceholders(value);
-                        method.invoke(obj, ClassUtils.convertPrimitive(ScopeModelUtil.getFrameworkModel(getScopeModel()), method.getParameterTypes()[0], value));
+                        //将string类型的属性值转换成目标类型的属性值.
+                        Object o = ClassUtils.convertPrimitive(ScopeModelUtil.getFrameworkModel(getScopeModel()), method.getParameterTypes()[0], value);
+                        //通过反射调用setXxx方法将配置信息设置到对象中
+                        method.invoke(obj, o);
                     }
                 } catch (Exception e) {
                     logger.info("Failed to override the property " + method.getName() + " in " +
@@ -736,6 +744,7 @@ public abstract class AbstractConfig implements Serializable {
                         ", please make sure every property has getter/setter method provided.");
                 }
             } else if (isParametersSetter(method)) {
+                // setParameters 情况 类型是Map 情况
                 String propertyName = extractPropertyName(method.getName());
 
                 // get old map from original obj
@@ -778,6 +787,8 @@ public abstract class AbstractConfig implements Serializable {
 
                 invokeSetParameters(newMap, obj);
             } else if (isNestedSetter(obj, method)) {
+                //嵌套情况先初始化参数在设置到当前属性中
+                //setXXX(Aaa aa) 情况先初始化 Aaa 在填充到当前属性中
                 try {
                     Class<?> clazz = method.getParameterTypes()[0];
                     Object inner = clazz.getDeclaredConstructor().newInstance();

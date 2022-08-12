@@ -52,6 +52,7 @@ public class Transporters {
         } else {
             handler = new ChannelHandlerDispatcher(handlers);
         }
+        //spi获取一个Transporter实现, 由具体的Transporter进行绑定
         return getTransporter(url).bind(url, handler);
     }
 

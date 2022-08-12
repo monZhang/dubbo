@@ -66,6 +66,7 @@ public class HeartbeatHandler extends AbstractChannelHandlerDelegate {
         setReadTimestamp(channel);
         if (isHeartbeatRequest(message)) {
             Request req = (Request) message;
+            //是心跳请求且需要返回结果, 直接构建一个结果并返回
             if (req.isTwoWay()) {
                 Response res = new Response(req.getId(), req.getVersion());
                 res.setEvent(HEARTBEAT_EVENT);

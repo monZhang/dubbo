@@ -95,7 +95,7 @@ public abstract class AbstractProxyInvoker<T> implements Invoker<T> {
                     originEntry = Profiler.setToBizProfiler(profiler);
                 }
             }
-
+            //执行业务逻辑调用 最终调用到发布服务的具体业务实现并拿到结果
             Object value = doInvoke(proxy, invocation.getMethodName(), invocation.getParameterTypes(), invocation.getArguments());
 
             if (ProfilerSwitch.isEnableSimpleProfiler()) {
@@ -110,8 +110,10 @@ public abstract class AbstractProxyInvoker<T> implements Invoker<T> {
                 Profiler.setToBizProfiler(originEntry);
             }
 
+            //将结果封装成cf, 最后在封装成AsyncRpcResult 异步结果返回
             CompletableFuture<Object> future = wrapWithFuture(value, invocation);
             CompletableFuture<AppResponse> appResponseFuture = future.handle((obj, t) -> {
+                //appResponseFuture.get被调用的时会通过此handle 返回结果
                 AppResponse result = new AppResponse(invocation);
                 if (t != null) {
                     if (t instanceof CompletionException) {

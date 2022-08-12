@@ -58,10 +58,12 @@ public class InstantiationStrategy {
         List<Constructor> matchedConstructors = new ArrayList<>();
         Constructor<?>[] declaredConstructors = type.getConstructors();
         for (Constructor<?> constructor : declaredConstructors) {
+            //存在有参构造时,有参构造的参数必须全部是scopeModel或其子类类型
             if (isMatched(constructor)) {
                 matchedConstructors.add(constructor);
             }
         }
+        // 存在合适的(类型全是scopeModel)有参构造则使用有参构造
         // remove default constructor from matchedConstructors
         if (defaultConstructor != null) {
             matchedConstructors.remove(defaultConstructor);
@@ -90,6 +92,7 @@ public class InstantiationStrategy {
         for (int i = 0; i < parameterTypes.length; i++) {
             args[i] = getArgumentValueForType(parameterTypes[i]);
         }
+        //反射创建实体
         return (T) targetConstructor.newInstance(args);
     }
 

@@ -100,6 +100,8 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
     protected Integer forks;
 
     public AbstractMethodConfig() {
+        //通过 frameworkModel -> applicationModel -> moduleModel 最终创建一个 moduleModel
+        //各级初始化的均为defaultModel
         super(ApplicationModel.defaultModel().getDefaultModule());
     }
 

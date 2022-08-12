@@ -48,19 +48,20 @@ public class FrameworkModel extends ScopeModel {
     private final AtomicLong appIndex = new AtomicLong(0);
 
     private static final Object globalLock = new Object();
-    
-    private volatile static FrameworkModel defaultInstance;
 
+    //默认生成一个实例
+    private volatile static FrameworkModel defaultInstance;
     private volatile ApplicationModel defaultAppModel;
 
     private static List<FrameworkModel> allInstances = new CopyOnWriteArrayList<>();
-
+    //关联的所有下层级的applicationModels
     private List<ApplicationModel> applicationModels = new CopyOnWriteArrayList<>();
-
+    //关联的非内部的所有下层appModel
     private List<ApplicationModel> pubApplicationModels = new CopyOnWriteArrayList<>();
 
+    //仓储
     private FrameworkServiceRepository serviceRepository;
-
+    //内部持有的一个应用级模块, 自己创建
     private ApplicationModel internalApplicationModel;
 
     private final Object instLock = new Object();

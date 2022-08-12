@@ -221,37 +221,47 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
 
     @Override
     public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcException {
+        //获取注册中心地址
         URL registryUrl = getRegistryUrl(originInvoker);
         // url to export locally
+        //服务提供者的url地址,
         URL providerUrl = getProviderUrl(originInvoker);
 
         // Subscribe the override data
         // FIXME When the provider subscribes, it will affect the scene : a certain JVM exposes the service and call
         //  the same service. Because the subscribed is cached key with the name of the service, it causes the
         //  subscription information to cover.
+        //获取override协议的访问地址, 注册监听器
         final URL overrideSubscribeUrl = getSubscribedOverrideUrl(providerUrl);
         final OverrideListener overrideSubscribeListener = new OverrideListener(overrideSubscribeUrl, originInvoker);
         Map<URL, NotifyListener> overrideListeners = getProviderConfigurationListener(providerUrl).getOverrideListeners();
         overrideListeners.put(registryUrl, overrideSubscribeListener);
-
+        //通过override协议地址 改写得到 provider注册到注册中心的地址
         providerUrl = overrideUrlWithConfig(providerUrl, overrideSubscribeListener);
         //export invoker
+        //本地发布服务, 发布完成在本地 20880 端口即可访问.
+        //本地发布时会调用 dubboProtocol 创建nettyServer设置回调handler 打开网络监听.
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker, providerUrl);
 
         // url to registry
+        // 根据url获取注册中心以及 provider需要注册到注册中心的地址,
+        // 注册中心如果没有那么就创建一个
         final Registry registry = getRegistry(registryUrl);
         final URL registeredProviderUrl = getUrlToRegistry(providerUrl, registryUrl);
 
         // decide if we need to delay publish (provider itself and registry should both need to register)
         boolean register = providerUrl.getParameter(REGISTER_KEY, true) && registryUrl.getParameter(REGISTER_KEY, true);
+        //根据url参数判断是否需要进行远程服务注册
         if (register) {
+            //真正向注册中心服务端发起远程服务注册
             register(registry, registeredProviderUrl);
         }
 
         // register stated url on provider model
+        //providerMode关联注册相关的信息( 是否注册, 注册出去的地址  注册中心地址)
         registerStatedUrl(registryUrl, registeredProviderUrl, register);
 
-
+        //将注册到注册中心的地址, override协议地址保存到exporter中
         exporter.setRegisterUrl(registeredProviderUrl);
         exporter.setSubscribeUrl(overrideSubscribeUrl);
 
@@ -291,6 +301,7 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
 
         return (ExporterChangeableWrapper<T>) bounds.computeIfAbsent(key, s -> {
             Invoker<?> invokerDelegate = new InvokerDelegate<>(originInvoker, providerUrl);
+            //调用dubboProtocol进行本地服务发布(创建服务器监听20880端口)
             return new ExporterChangeableWrapper<>((Exporter<T>) protocol.export(invokerDelegate), originInvoker);
         });
     }
@@ -389,7 +400,9 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
      * @return
      */
     protected Registry getRegistry(final URL registryUrl) {
+        //通过spi自适应能力根据url中协议类型 获取对应的注册中心工厂
         RegistryFactory registryFactory = ScopeModelUtil.getExtensionLoader(RegistryFactory.class, registryUrl.getScopeModel()).getAdaptiveExtension();
+        //使用工厂创建registry, registry创建时需要进行一系列初始化工作, 连接到zk, 本地缓存处理, 线程池 任务...
         return registryFactory.getRegistry(registryUrl);
     }
 

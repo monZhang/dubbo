@@ -47,6 +47,10 @@ import static org.apache.dubbo.metadata.report.support.Constants.METADATA_REPORT
  *
  * <dubbo:registry id=demo2 address="registry://"/>
  * <dubbo:metadata id=demo2 address="metadata://"/>
+ *
+ * 元数据上报组件(MetadataReport)的存储仓库
+ * 元数据上报组件 MetadataReport 在deployer.start() 期间被创建
+ *
  */
 public class MetadataReportInstance implements Disposable {
 
@@ -75,6 +79,7 @@ public class MetadataReportInstance implements Disposable {
 
         MetadataReportFactory metadataReportFactory = applicationModel.getExtensionLoader(MetadataReportFactory.class).getAdaptiveExtension();
         for (MetadataReportConfig metadataReportConfig : metadataReportConfigs) {
+            //根据元数据上报配置创建一个元数据上报组件(MetadataReport ), 用于在后续需要的时候使用其进行元数据上报.
             init(metadataReportConfig, metadataReportFactory);
         }
     }
@@ -93,6 +98,8 @@ public class MetadataReportInstance implements Disposable {
         String relatedRegistryId = isEmpty(config.getRegistry()) ? (isEmpty(config.getId()) ? DEFAULT_KEY : config.getId()) : config.getRegistry();
 //        RegistryConfig registryConfig = applicationModel.getConfigManager().getRegistry(relatedRegistryId)
 //                .orElseThrow(() -> new IllegalStateException("Registry id " + relatedRegistryId + " does not exist."));
+        //根据metadataReportFactory创建一个元数据上报组件( MetadataReport),
+        // MetadataReport 封装了网络交互组件Transporter, Transporter又封装了真正与元数据中心交互的 client ( zk,redis, nacos..)
         MetadataReport metadataReport = metadataReportFactory.getMetadataReport(url);
         if (metadataReport != null) {
             metadataReports.put(relatedRegistryId, metadataReport);

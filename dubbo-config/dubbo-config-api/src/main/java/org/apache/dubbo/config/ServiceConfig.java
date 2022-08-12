@@ -199,9 +199,11 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
     public void init() {
         if (this.initialized.compareAndSet(false, true)) {
             // load ServiceListeners from extension
+            //加载所有支持的服务监听器, 当服务发布或者销毁时会回调这些监听器做一些逻辑处理
             ExtensionLoader<ServiceListener> extensionLoader = this.getExtensionLoader(ServiceListener.class);
             this.serviceListeners.addAll(extensionLoader.getSupportedExtensionInstances());
         }
+        //初始化服务元数据( group version 接口名称 实现类类型 实现类 生成一个serviceKey)
         initServiceMetadata(provider);
         serviceMetadata.setServiceType(getInterfaceClass());
         serviceMetadata.setTarget(getRef());
@@ -223,12 +225,16 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
             }
 
             if (!this.isRefreshed()) {
+                //配置ServiceConfig信息填充,分配
                 this.refresh();
             }
             if (this.shouldExport()) {
+                //初始化 服务监听器
+                //初始化 服务元数据
                 this.init();
 
                 if (shouldDelay()) {
+                    //延迟发布
                     doDelayExport();
                 } else {
                     doExport();
@@ -359,7 +365,10 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         if (StringUtils.isEmpty(path)) {
             path = interfaceName;
         }
+        //执行服务发布
         doExportUrls();
+        //服务发布完成, 更新服务发布状态为已发布
+        //发布一个服务发布事件,
         exported();
     }
 
@@ -374,18 +383,18 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         } else {
             serviceDescriptor = repository.registerService(getInterfaceClass());
         }
+        //构建providerModel并注册到仓储
         providerModel = new ProviderModel(getUniqueServiceName(),
             ref,
             serviceDescriptor,
             getScopeModel(),
             serviceMetadata, interfaceClassLoader);
-
         // Compatible with dependencies on ServiceModel#getServiceConfig(), and will be removed in a future version
         providerModel.setConfig(this);
-
         providerModel.setDestroyCaller(getDestroyRunner());
         repository.registerProvider(providerModel);
 
+        //生成注册中心的url
         List<URL> registryURLs = ConfigValidationUtils.loadRegistries(this, true);
 
         for (ProtocolConfig protocolConfig : protocols) {
@@ -397,6 +406,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                 // In case user specified path, register service one more time to map it to path.
                 repository.registerService(pathKey, interfaceClass);
             }
+            //使用protocol发布服务, 核心
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
 
@@ -411,6 +421,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         // init serviceMetadata attachments
         serviceMetadata.getAttachments().putAll(map);
 
+        //生成服务实例需要对外暴露的url
         URL url = buildUrl(protocolConfig, map);
 
         exportUrl(url, registryURLs);
@@ -576,11 +587,13 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
 
             // export to local if the config is not remote (export to remote only when config is remote)
             if (!SCOPE_REMOTE.equalsIgnoreCase(scope)) {
+                //执行本地发布 jvm
                 exportLocal(url);
             }
 
             // export to remote if the config is not local (export to local only when config is local)
             if (!SCOPE_LOCAL.equalsIgnoreCase(scope)) {
+                //执行远程发布
                 url = exportRemote(url, registryURLs);
                 if (!isGeneric(generic) && !getScopeModel().isInternal()) {
                     MetadataUtils.publishServiceDefinition(url, providerModel.getServiceModel(), getApplicationModel());
@@ -640,10 +653,13 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrl(URL url, boolean withMetaData) {
+        //invoker - 需要发布的接口的代理实现, 当发布的接口被调用时会通过此Invoker 最终调用到接口的具体实现.
         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, url);
         if (withMetaData) {
             invoker = new DelegateProviderMetaDataInvoker(invoker, this);
         }
+
+        //使用协议发布invoker, 拿到exporter, exporter就代表了我们发布的服务
         Exporter<?> exporter = protocolSPI.export(invoker);
         exporters.add(exporter);
     }

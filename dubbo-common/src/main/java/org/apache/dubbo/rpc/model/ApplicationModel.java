@@ -54,17 +54,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ApplicationModel extends ScopeModel {
     protected static final Logger LOGGER = LoggerFactory.getLogger(ApplicationModel.class);
     public static final String NAME = "ApplicationModel";
+    //持有的所有moduleModel
     private final List<ModuleModel> moduleModels = new CopyOnWriteArrayList<>();
+    //持有的非内部moduleModel
     private final List<ModuleModel> pubModuleModels = new CopyOnWriteArrayList<>();
     private Environment environment;
     private ConfigManager configManager;
+    //服务信息仓储
     private ServiceRepository serviceRepository;
+    //管理部分组件的生命中周期.
     private ApplicationDeployer deployer;
-
+    //与parent一致保存的是父层级引用
     private final FrameworkModel frameworkModel;
-
+    //内部持有的一个自己创建的ModuleModel, 自己创建并加入到 moduleModels列表中
     private ModuleModel internalModule;
-
+    //在持有的所有下层moduleModel列表中( moduleModels )第一个非内部moduleModel的module
     private volatile ModuleModel defaultModule;
 
     // internal module index is 0, default module index is 1
@@ -219,6 +223,7 @@ public class ApplicationModel extends ScopeModel {
 
         initApplicationExts();
 
+        //执行初始化 包含deployer的初始化 DefaultApplicationDeployer
         ExtensionLoader<ScopeModelInitializer> initializerExtensionLoader = this.getExtensionLoader(ScopeModelInitializer.class);
         Set<ScopeModelInitializer> initializers = initializerExtensionLoader.getSupportedExtensionInstances();
         for (ScopeModelInitializer initializer : initializers) {
@@ -374,6 +379,7 @@ public class ApplicationModel extends ScopeModel {
         if (defaultModule == null) {
             synchronized (moduleLock) {
                 if (defaultModule == null) {
+                    //持有的下层moduleModel中第一个非内部moduleModel
                     defaultModule = findDefaultModule();
                     if (defaultModule == null) {
                         defaultModule = this.newModule();

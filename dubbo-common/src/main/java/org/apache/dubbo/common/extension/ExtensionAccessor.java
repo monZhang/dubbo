@@ -21,6 +21,7 @@ package org.apache.dubbo.common.extension;
  */
 public interface ExtensionAccessor {
 
+    //extensionDirector
     ExtensionDirector getExtensionDirector();
 
     default <T> ExtensionLoader<T> getExtensionLoader(Class<T> type) {

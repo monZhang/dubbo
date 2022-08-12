@@ -103,6 +103,7 @@ public class DubboProtocol extends AbstractProtocol {
 
     private AtomicBoolean destroyed = new AtomicBoolean();
 
+    //服务请求处理器, 当netty服务器被调用时回调此handler
     private ExchangeHandler requestHandler = new ExchangeHandlerAdapter() {
 
         @Override
@@ -115,6 +116,7 @@ public class DubboProtocol extends AbstractProtocol {
             }
 
             Invocation inv = (Invocation) message;
+            //获取具体业务实现的 invoker封装
             Invoker<?> invoker = getInvoker(channel, inv);
             inv.setServiceModel(invoker.getUrl().getServiceModel());
             // switch TCCL
@@ -145,15 +147,18 @@ public class DubboProtocol extends AbstractProtocol {
                 }
             }
             RpcContext.getServiceContext().setRemoteAddress(channel.getRemoteAddress());
+            //调用 invoker 进而调用到具体的业务实现 拿到返回结果.
             Result result = invoker.invoke(inv);
+            //封装异步结果.
             return result.thenApply(Function.identity());
         }
 
         @Override
         public void received(Channel channel, Object message) throws RemotingException {
+            //接收到网络请求后, 此方法被执行
             if (message instanceof Invocation) {
+                //请求信息时 Invocation 时说明是consumer服务调用, 调用reply方法处理
                 reply((ExchangeChannel) channel, message);
-
             } else {
                 super.received(channel, message);
             }
@@ -282,6 +287,7 @@ public class DubboProtocol extends AbstractProtocol {
                 (String) inv.getObjectAttachmentWithoutConvert(VERSION_KEY),
                 (String) inv.getObjectAttachmentWithoutConvert(GROUP_KEY)
         );
+        //获取提前缓存的dubboExporter, dubboExporter封装了需要被调用的具体业务实现的invoker封装
         DubboExporter<?> exporter = (DubboExporter<?>) exporterMap.get(serviceKey);
 
         if (exporter == null) {
@@ -323,7 +329,7 @@ public class DubboProtocol extends AbstractProtocol {
 
             }
         }
-
+        //打开网络服务器, 接收网络请求
         openServer(url);
         optimizeSerialization(url);
 
@@ -342,6 +348,7 @@ public class DubboProtocol extends AbstractProtocol {
                 synchronized (this) {
                     server = serverMap.get(key);
                     if (server == null) {
+                        //创建服务器启动对指定端口的监听, 并将新建的服务器缓存在本地.
                         serverMap.put(key, createServer(url));
                     }else {
                         server.reset(url);
@@ -376,6 +383,9 @@ public class DubboProtocol extends AbstractProtocol {
 
         ExchangeServer server;
         try {
+            //通过网络交换器 将请求处理handler与url进行绑定
+            //后续有请求访问指定url时, 与之绑定的requestHandler会被回调.
+            //绑定后获得一个 ExchangeServer 表示一个网络服务器.
             server = Exchangers.bind(url, requestHandler);
         } catch (RemotingException e) {
             throw new RpcException("Fail to start server(url: " + url + ") " + e.getMessage(), e);
@@ -388,7 +398,7 @@ public class DubboProtocol extends AbstractProtocol {
                 throw new RpcException("Unsupported client type: " + str);
             }
         }
-
+        //包装成DubboProtocolServer
         DubboProtocolServer protocolServer = new DubboProtocolServer(server);
         loadServerProperties(protocolServer);
         return protocolServer;

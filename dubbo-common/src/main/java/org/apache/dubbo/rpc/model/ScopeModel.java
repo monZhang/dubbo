@@ -62,16 +62,22 @@ public abstract class ScopeModel implements ExtensionAccessor {
 
     private Set<ClassLoader> classLoaders;
 
+    // 记录scopeModel的父级节点,
+    // 通过这个属性将多个scopeMode关联起来,组成一个树形结果:
+    // moduleModel -> applicationModel -> frameworkModel
     private final ScopeModel parent;
+    //标记该model中拓展实例的使用范围
     private final ExtensionScope scope;
 
+    //ExtensionLoader的管理工具, 通过该工具完成对extensionLoader的创建, 对拓展实例的获取
     private ExtensionDirector extensionDirector;
-
+    //dubbo 实现的简单bean工厂
     private ScopeBeanFactory beanFactory;
     private List<ScopeModelDestroyListener> destroyListeners;
 
     private Map<String, Object> attributes;
     private final AtomicBoolean destroyed = new AtomicBoolean(false);
+    //是否是内部自己的scopeModel
     private final boolean internalScope;
 
     public ScopeModel(ScopeModel parent, ExtensionScope scope, boolean isInternal) {

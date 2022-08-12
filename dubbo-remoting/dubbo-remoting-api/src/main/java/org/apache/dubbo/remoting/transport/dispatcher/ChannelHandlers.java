@@ -42,7 +42,13 @@ public class ChannelHandlers {
     }
 
     protected ChannelHandler wrapInternal(ChannelHandler handler, URL url) {
-        return new MultiMessageHandler(new HeartbeatHandler(url.getOrDefaultFrameworkModel().getExtensionLoader(Dispatcher.class)
-                .getAdaptiveExtension().dispatch(handler, url)));
+
+        //获取Dispatcher (默认 AllDispatcher )
+        Dispatcher dispatcher = url.getOrDefaultFrameworkModel().getExtensionLoader(Dispatcher.class).getAdaptiveExtension();
+        ChannelHandler dispatchHandler = dispatcher.dispatch(handler, url);
+        //处理心跳请求的处理器
+        HeartbeatHandler heartbeatHandler = new HeartbeatHandler(dispatchHandler);
+        //多消息处理器, 同时接收到个请求消息, 循环处理每一个
+        return new MultiMessageHandler(heartbeatHandler);
     }
 }

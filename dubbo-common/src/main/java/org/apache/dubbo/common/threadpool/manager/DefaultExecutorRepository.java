@@ -59,6 +59,7 @@ public class DefaultExecutorRepository implements ExecutorRepository, ExtensionA
 
     private volatile ExecutorService serviceReferExecutor;
 
+    // Map<"INTERNAL_SERVICE_EXECUTOR", <20880, ExecutorService>>
     private final ConcurrentMap<String, ConcurrentMap<Integer, ExecutorService>> data = new ConcurrentHashMap<>();
 
     private final Object LOCK = new Object();
@@ -84,9 +85,11 @@ public class DefaultExecutorRepository implements ExecutorRepository, ExtensionA
         // Consumer's executor is sharing globally, key=Integer.MAX_VALUE. Provider's executor is sharing by protocol.
         Integer portKey = CONSUMER_SIDE.equalsIgnoreCase(url.getParameter(SIDE_KEY)) ? Integer.MAX_VALUE : url.getPort();
         if (url.getParameter(THREAD_NAME_KEY) == null) {
+            //给个默认的线程名称
             url = url.putAttribute(THREAD_NAME_KEY, "Dubbo-protocol-" + portKey);
         }
         URL finalUrl = url;
+        //创建一个固定大小的线程池, 默认线程200个, queue容量为0
         ExecutorService executor = executors.computeIfAbsent(portKey, k -> createExecutor(finalUrl));
         // If executor has been shut down, create a new one
         if (executor.isShutdown() || executor.isTerminated()) {
@@ -115,11 +118,13 @@ public class DefaultExecutorRepository implements ExecutorRepository, ExtensionA
     }
 
     private ExecutorService createExecutor(URL url) {
+        //spi创建一个固定线程池 fixedThreadPoll
         return (ExecutorService) extensionAccessor.getExtensionLoader(ThreadPool.class).getAdaptiveExtension().getExecutor(url);
     }
 
     @Override
     public ExecutorService getExecutor(URL url) {
+        //根据url获取线程池缓存key 默认: INTERNAL_SERVICE_EXECUTOR
         Map<Integer, ExecutorService> executors = data.get(getExecutorKey(url));
 
         /*
@@ -133,6 +138,7 @@ public class DefaultExecutorRepository implements ExecutorRepository, ExtensionA
         }
 
         // Consumer's executor is sharing globally, key=Integer.MAX_VALUE. Provider's executor is sharing by protocol.
+        //根据端口号获取其对应的线程池
         Integer portKey = CONSUMER_SIDE.equalsIgnoreCase(url.getParameter(SIDE_KEY)) ? Integer.MAX_VALUE : url.getPort();
         ExecutorService executor = executors.get(portKey);
         if (executor != null && (executor.isShutdown() || executor.isTerminated())) {

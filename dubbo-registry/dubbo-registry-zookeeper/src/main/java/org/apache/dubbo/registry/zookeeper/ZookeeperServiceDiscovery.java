@@ -73,9 +73,11 @@ public class ZookeeperServiceDiscovery extends AbstractServiceDiscovery {
     public ZookeeperServiceDiscovery(ApplicationModel applicationModel, URL registryURL) {
         super(applicationModel, registryURL);
         try {
+            //创建zk客户端并完成连接
             this.curatorFramework = buildCuratorFramework(registryURL, this);
             this.rootPath = getRootPath(registryURL);
             this.serviceDiscovery = buildServiceDiscovery(curatorFramework, rootPath);
+
             this.serviceDiscovery.start();
         } catch (Exception e) {
             throw new IllegalStateException("Create zookeeper service discovery failed.", e);

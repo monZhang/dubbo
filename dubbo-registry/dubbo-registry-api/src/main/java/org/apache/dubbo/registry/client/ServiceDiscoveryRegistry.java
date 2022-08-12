@@ -83,6 +83,7 @@ public class ServiceDiscoveryRegistry extends FailbackRegistry {
 
     public ServiceDiscoveryRegistry(URL registryURL, ApplicationModel applicationModel) {
         super(registryURL);
+        //创建服务发现组件
         this.serviceDiscovery = createServiceDiscovery(registryURL);
         this.serviceNameMapping = (AbstractServiceNameMapping) ServiceNameMapping.getDefaultExtension(registryURL.getScopeModel());
         super.applicationModel = applicationModel;
@@ -106,6 +107,7 @@ public class ServiceDiscoveryRegistry extends FailbackRegistry {
      * @return non-null
      */
     protected ServiceDiscovery createServiceDiscovery(URL registryURL) {
+        //获取ServiceDiscovery实例
         return getServiceDiscovery(registryURL.addParameter(INTERFACE_KEY, ServiceDiscovery.class.getName())
             .removeParameter(REGISTRY_TYPE_KEY));
     }
@@ -118,6 +120,7 @@ public class ServiceDiscoveryRegistry extends FailbackRegistry {
      * @return
      */
     private ServiceDiscovery getServiceDiscovery(URL registryURL) {
+        //通过spi获取 serviceDiscovery 工厂, 并生成ServiceDiscovery实例
         ServiceDiscoveryFactory factory = getExtension(registryURL);
         return factory.getServiceDiscovery(registryURL);
     }

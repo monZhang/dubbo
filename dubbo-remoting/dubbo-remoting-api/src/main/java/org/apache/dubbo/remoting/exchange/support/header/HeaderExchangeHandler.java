@@ -100,6 +100,7 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
             CompletionStage<Object> future = handler.reply(channel, msg);
             future.whenComplete((appResult, t) -> {
                 try {
+                    //等待业务处理完成, 业务处理完成后回调此方法 响应给consumer
                     if (t == null) {
                         res.setStatus(Response.OK);
                         res.setResult(appResult);
@@ -107,6 +108,7 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
                         res.setStatus(Response.SERVICE_ERROR);
                         res.setErrorMessage(StringUtils.toString(t));
                     }
+                    //写回channel 返回给请求方
                     channel.send(res);
                 } catch (RemotingException e) {
                     logger.warn("Send result to consumer failed, channel is " + channel + ", msg is " + e);

@@ -84,6 +84,7 @@ public abstract class CacheableFailbackRegistry extends FailbackRegistry {
         extraParameters = new HashMap<>(8);
         extraParameters.put(CHECK_KEY, String.valueOf(false));
 
+        //缓存定时清理线程池
         cacheRemovalScheduler = url.getOrDefaultFrameworkModel().getBeanFactory().getBean(FrameworkExecutorRepository.class).nextScheduledExecutor();
         cacheRemovalTaskIntervalInMillis = getIntConfig(url.getScopeModel(), CACHE_CLEAR_TASK_INTERVAL, 2 * 60 * 1000);
         cacheClearWaitingThresholdInMillis = getIntConfig(url.getScopeModel(), CACHE_CLEAR_WAITING_THRESHOLD, 5 * 60 * 1000);

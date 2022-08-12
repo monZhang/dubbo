@@ -182,13 +182,15 @@ public class DefaultApplicationDeployer extends AbstractDeployer<ApplicationMode
             // register shutdown hook
             registerShutdownHook();
 
+            //启动配置中心
             startConfigCenter();
-
             loadApplicationConfigs();
 
+            //初始化applicationModel持有的所有moduleDeployer
             initModuleDeployers();
 
             // @since 2.7.8
+            //启动元数据中心 - 初始化元数据上报组件并与元数据中心建立连接.
             startMetadataCenter();
 
             initialized = true;
@@ -235,10 +237,12 @@ public class DefaultApplicationDeployer extends AbstractDeployer<ApplicationMode
         // check Config Center
         Collection<ConfigCenterConfig> configCenters = configManager.getConfigCenters();
         if (CollectionUtils.isEmpty(configCenters)) {
+            //创建一个配置中心配置, 并调用refresh分配配置属性
             ConfigCenterConfig configCenterConfig = new ConfigCenterConfig();
             configCenterConfig.setScopeModel(applicationModel);
             configCenterConfig.refresh();
             ConfigValidationUtils.validateConfigCenterConfig(configCenterConfig);
+            //校验配置中心地址是否存在, 如果不存在直接跳过, 白玩.
             if (configCenterConfig.isValid()) {
                 configManager.addConfigCenter(configCenterConfig);
                 configCenters = configManager.getConfigCenters();
@@ -265,27 +269,30 @@ public class DefaultApplicationDeployer extends AbstractDeployer<ApplicationMode
     }
 
     private void startMetadataCenter() {
-
+        //如果没有配置元数据中心, 则使用注册中心做元数据中心
         useRegistryAsMetadataCenterIfNecessary();
 
         ApplicationConfig applicationConfig = getApplication();
-
         String metadataType = applicationConfig.getMetadataType();
         // FIXME, multiple metadata config support.
         Collection<MetadataReportConfig> metadataReportConfigs = configManager.getMetadataConfigs();
         if (CollectionUtils.isEmpty(metadataReportConfigs)) {
+            //没有配置元数据中心的情况 使用注册中心配置创建一个元数据中心配置, 所以正常情况不可能走到这里
             if (REMOTE_METADATA_STORAGE_TYPE.equals(metadataType)) {
                 throw new IllegalStateException("No MetadataConfig found, Metadata Center address is required when 'metadata=remote' is enabled.");
             }
             return;
         }
 
+        //创建MetadataReport管理工具, 用来初始化和维护MetadataReport的缓存
         MetadataReportInstance metadataReportInstance = applicationModel.getBeanFactory().getBean(MetadataReportInstance.class);
         List<MetadataReportConfig> validMetadataReportConfigs = new ArrayList<>(metadataReportConfigs.size());
         for (MetadataReportConfig metadataReportConfig : metadataReportConfigs) {
+            //校验配置的地址,协议信息
             ConfigValidationUtils.validateMetadataConfig(metadataReportConfig);
             validMetadataReportConfigs.add(metadataReportConfig);
         }
+        //创建元数据上报组件( MetadataReport) 实例并缓存
         metadataReportInstance.init(validMetadataReportConfigs);
         if (!metadataReportInstance.inited()) {
             throw new IllegalStateException(String.format("%s MetadataConfigs found, but none of them is valid.", metadataReportConfigs.size()));
@@ -366,11 +373,11 @@ public class DefaultApplicationDeployer extends AbstractDeployer<ApplicationMode
     private void useRegistryAsMetadataCenterIfNecessary() {
 
         Collection<MetadataReportConfig> metadataConfigs = configManager.getMetadataConfigs();
-
+        //如果配置了元数据中心直接返回
         if (CollectionUtils.isNotEmpty(metadataConfigs)) {
             return;
         }
-
+        //没有配置元数据中心则使用注册中心配置做元数据中心配置
         List<RegistryConfig> defaultRegistries = configManager.getDefaultRegistries();
         if (defaultRegistries.size() > 0) {
             defaultRegistries

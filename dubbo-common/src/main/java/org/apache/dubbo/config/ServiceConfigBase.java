@@ -226,6 +226,7 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
         super.preProcessRefresh();
         convertProviderIdToProvider();
         if (provider == null) {
+            //创建provider配置信息
             provider = getModuleConfigManager()
                     .getDefaultProvider()
                     .orElseThrow(() -> new IllegalStateException("Default provider is not initialized"));

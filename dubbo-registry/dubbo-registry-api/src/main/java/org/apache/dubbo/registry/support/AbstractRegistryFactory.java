@@ -57,6 +57,7 @@ public abstract class AbstractRegistryFactory implements RegistryFactory, ScopeM
                 "Please check if `setApplicationModel` has been override.");
         }
 
+        //如果当前服务已经关闭, 则返回一个空实现的注册中心
         Registry defaultNopRegistry = registryManager.getDefaultNopRegistryIfDestroyed();
         if (null != defaultNopRegistry) {
             return defaultNopRegistry;
@@ -69,6 +70,7 @@ public abstract class AbstractRegistryFactory implements RegistryFactory, ScopeM
             .removeAttribute(EXPORT_KEY)
             .removeAttribute(REFER_KEY)
             .build();
+        //根据url构建缓存key ( key: "service-discovery-registry://127.0.0.1:2181/org.apache.dubbo.registry.RegistryService" )
         String key = createRegistryCacheKey(url);
         Registry registry = null;
         boolean check = url.getParameter(CHECK_KEY, true) && url.getPort() != 0;
@@ -81,11 +83,13 @@ public abstract class AbstractRegistryFactory implements RegistryFactory, ScopeM
             if (null != defaultNopRegistry) {
                 return defaultNopRegistry;
             }
+            //从缓存中获取registry
             registry = registryManager.getRegistry(key);
             if (registry != null) {
                 return registry;
             }
             //create registry by spi/ioc
+            //缓存中未获取到, 执行注册中心创建, 根据自己的类型调用子类具体实现进行registry创建.
             registry = createRegistry(url);
             if (check && registry == null) {
                 throw new IllegalStateException("Can not create registry " + url);

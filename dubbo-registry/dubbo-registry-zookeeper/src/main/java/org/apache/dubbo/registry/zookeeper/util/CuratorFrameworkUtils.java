@@ -80,7 +80,7 @@ public abstract class CuratorFrameworkUtils {
         CuratorFramework curatorFramework = builder.build();
 
         curatorFramework.getConnectionStateListenable().addListener(new CuratorConnectionStateListener(connectionURL, serviceDiscovery));
-
+        //基于curator框架创建zk客户端并完成连接
         curatorFramework.start();
         curatorFramework.blockUntilConnected(BLOCK_UNTIL_CONNECTED_WAIT.getParameterValue(connectionURL),
             BLOCK_UNTIL_CONNECTED_UNIT.getParameterValue(connectionURL));

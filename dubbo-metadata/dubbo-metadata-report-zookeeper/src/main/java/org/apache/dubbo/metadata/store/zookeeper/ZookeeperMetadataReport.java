@@ -74,6 +74,8 @@ public class ZookeeperMetadataReport extends AbstractMetadataReport {
             group = PATH_SEPARATOR + group;
         }
         this.root = group;
+        //使用zk网络交换组件连接到指定的url, 这里会先找一下之前是否已经创建了相同地址连接的客户端,
+        //如果没有那么就创建一个客户端并与对应的url建立连接
         zkClient = zookeeperTransporter.connect(url);
     }
 

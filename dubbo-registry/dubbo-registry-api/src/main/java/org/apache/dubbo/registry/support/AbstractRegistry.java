@@ -102,11 +102,15 @@ public abstract class AbstractRegistry implements Registry {
     public AbstractRegistry(URL url) {
         setUrl(url);
         registryManager = url.getOrDefaultApplicationModel().getBeanFactory().getBean(RegistryManager.class);
+        //是否开启本地缓存, 默认开始
         localCacheEnabled = url.getParameter(REGISTRY_LOCAL_FILE_CACHE_ENABLED, true);
+        //创建registry线程池
         registryCacheExecutor = url.getOrDefaultFrameworkModel().getBeanFactory()
             .getBean(FrameworkExecutorRepository.class).getSharedExecutor();
         if (localCacheEnabled) {
             // Start file save timer
+            //本地缓存保存到文件时, 默认使用异步方式
+            //本地文件缓存名称: /Users/didi/.dubbo/dubbo-registry-dubbo-demo-api-provider-127.0.0.1-2181.cache
             syncSaveFile = url.getParameter(REGISTRY_FILESAVE_SYNC_KEY, false);
             String defaultFilename = System.getProperty(USER_HOME) + DUBBO_REGISTRY + url.getApplication() +
                 "-" + url.getAddress().replaceAll(":", "-") + CACHE;
@@ -123,7 +127,9 @@ public abstract class AbstractRegistry implements Registry {
             this.file = file;
             // When starting the subscription center,
             // we need to read the local cache file for future Registry fault tolerance processing.
+            //从文件中读取缓存信息
             loadProperties();
+            //发送通知, 基于现有注册信息 进行本地文件备份.
             notify(url.getBackupUrls());
         }
     }
@@ -174,6 +180,7 @@ public abstract class AbstractRegistry implements Registry {
     }
 
     public void doSaveProperties(long version) {
+        //通过版本号控制是否是最新的操作, 防止多线程操作下老数据覆盖新数据情况
         if (version < lastCacheChanged.get()) {
             return;
         }
@@ -189,6 +196,7 @@ public abstract class AbstractRegistry implements Registry {
             }
             try (RandomAccessFile raf = new RandomAccessFile(lockfile, "rw");
                  FileChannel channel = raf.getChannel()) {
+                //获取文件锁
                 FileLock lock = channel.tryLock();
                 if (lock == null) {
                     throw new IOException("Can not lock the registry cache file " + file.getAbsolutePath() + ", " +
@@ -208,6 +216,7 @@ public abstract class AbstractRegistry implements Registry {
                     } else {
                         // Using properties.setProperty and properties.store method will cause lock contention
                         // under multi-threading, so deep copy a new container
+                        //多线程情况需要拷贝一个properties, 因为properties内部方法存在争锁问题
                         tmpProperties = new Properties();
                         Set<Map.Entry<Object, Object>> entries = properties.entrySet();
                         for (Map.Entry<Object, Object> entry : entries) {
@@ -216,6 +225,7 @@ public abstract class AbstractRegistry implements Registry {
                     }
 
                     try (FileOutputStream outputFile = new FileOutputStream(file)) {
+                        //注册信息写入文件.
                         tmpProperties.store(outputFile, "Dubbo Registry Cache");
                     }
                 } finally {
@@ -466,6 +476,7 @@ public abstract class AbstractRegistry implements Registry {
             listener.notify(categoryList);
             // We will update our cache file after each notification.
             // When our Registry has a subscribed failure due to network jitter, we can return at least the existing cache URL.
+            //更新本地缓存文件.
             if (localCacheEnabled) {
                 saveProperties(url);
             }
@@ -491,6 +502,7 @@ public abstract class AbstractRegistry implements Registry {
                 }
             }
             properties.setProperty(url.getServiceKey(), buf.toString());
+            //版本控制, 方式老数据覆盖新数据情况
             long version = lastCacheChanged.incrementAndGet();
             if (syncSaveFile) {
                 doSaveProperties(version);

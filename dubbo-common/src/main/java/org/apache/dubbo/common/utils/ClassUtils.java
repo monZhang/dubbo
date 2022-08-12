@@ -332,9 +332,11 @@ public class ClassUtils {
         if (isEmpty(value)) {
             return null;
         }
+        //获取原始类型的包装类, 如:type = int.class -->  wrapperType = Integer.class
         Class<?> wrapperType = WRAPPER_PRIMITIVE_TYPE_MAP.getOrDefault(type, type);
         Object result = null;
         try {
+            //将String类型的value转换成对应的目标类型的value
             result = frameworkModel.getBeanFactory().getBean(ConverterUtil.class).convertIfPossible(value, wrapperType);
         } catch (Exception e) {
             // ignore exception

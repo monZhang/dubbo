@@ -41,7 +41,14 @@ public class HeaderExchanger implements Exchanger {
 
     @Override
     public ExchangeServer bind(URL url, ExchangeHandler handler) throws RemotingException {
-        return new HeaderExchangeServer(Transporters.bind(url, new DecodeHandler(new HeaderExchangeHandler(handler))));
+
+        //对requestHandler进行多层包装, 使其原有功能被增强, 装饰者模式 静态代理
+        DecodeHandler decodeHandler = new DecodeHandler(new HeaderExchangeHandler(handler));
+
+        //exchanger创建一个exchangeServer, ExchangerServer包装了 RemotingServer
+        // (exchanger -> ExchangerServer -> RemotingServer)
+        //RemotingServer由 Transporters.bind 进行创建
+        return new HeaderExchangeServer(Transporters.bind(url, decodeHandler));
     }
 
 }

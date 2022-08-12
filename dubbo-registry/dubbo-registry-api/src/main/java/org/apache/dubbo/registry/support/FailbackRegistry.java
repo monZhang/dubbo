@@ -41,6 +41,7 @@ import static org.apache.dubbo.registry.Constants.REGISTRY_RETRY_PERIOD_KEY;
 
 /**
  * FailbackRegistry. (SPI, Prototype, ThreadSafe)
+ * 增强注册中心能力, 增加重试机制
  */
 public abstract class FailbackRegistry extends AbstractRegistry {
 
@@ -64,8 +65,8 @@ public abstract class FailbackRegistry extends AbstractRegistry {
 
     public FailbackRegistry(URL url) {
         super(url);
+        //注册重试任务, 默认重试间隔5s
         this.retryPeriod = url.getParameter(REGISTRY_RETRY_PERIOD_KEY, DEFAULT_REGISTRY_RETRY_PERIOD);
-
         // since the retry task will not be very much. 128 ticks is enough.
         retryTimer = new HashedWheelTimer(new NamedThreadFactory("DubboRegistryRetryTimer", true), retryPeriod, TimeUnit.MILLISECONDS, 128);
     }
@@ -89,8 +90,11 @@ public abstract class FailbackRegistry extends AbstractRegistry {
     }
 
     private void addFailedRegistered(URL url) {
+        //如果在重试中直接返回, 否则创建重试任务并提交
+        //记录重试标记
         FailedRegisteredTask oldOne = failedRegistered.get(url);
         if (oldOne != null) {
+
             return;
         }
         FailedRegisteredTask newTask = new FailedRegisteredTask(url, this);
@@ -201,6 +205,7 @@ public abstract class FailbackRegistry extends AbstractRegistry {
         removeFailedUnregistered(url);
         try {
             // Sending a registration request to the server side
+            //使用 ZookeeperRegistry 发起远程注册, 如果注册失败 创建重试任务每隔5s进行重试.
             doRegister(url);
         } catch (Exception e) {
             Throwable t = e;

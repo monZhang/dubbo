@@ -28,6 +28,9 @@ import org.apache.dubbo.rpc.model.ModuleModel;
 public enum ExtensionScope {
 
     /**
+     *
+     * 此作用域拓展实例可以在 framework, application, modules 使用
+     *
      * The extension instance is used within framework, shared with all applications and modules.
      *
      * <p>Framework scope SPI extension can only obtain {@link FrameworkModel},
@@ -43,6 +46,8 @@ public enum ExtensionScope {
     FRAMEWORK,
 
     /**
+     * 此作用域拓展实例可以在 自己的application以及其下属的所有modules中使用 , 不同的application之间隔离
+     *
      * The extension instance is used within one application, shared with all modules of the application,
      * and different applications create different extension instances.
      *
@@ -59,6 +64,8 @@ public enum ExtensionScope {
     APPLICATION,
 
     /**
+     * 此作用域拓展实例仅在单一modules使用 , 不同的modules需要创建不同的拓展实例
+    *
      * The extension instance is used within one module, and different modules create different extension instances.
      *
      * <p>Module scope SPI extension can obtain {@link FrameworkModel}, {@link ApplicationModel} and {@link ModuleModel}.</p>
@@ -72,6 +79,7 @@ public enum ExtensionScope {
     MODULE,
 
     /**
+     *  每次使用都创建一个实例
      * self-sufficient, creates an instance for per scope, for special SPI extension, like {@link ExtensionInjector}
      */
     SELF

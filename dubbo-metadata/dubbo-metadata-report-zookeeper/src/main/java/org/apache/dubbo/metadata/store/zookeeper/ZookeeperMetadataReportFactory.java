@@ -44,6 +44,7 @@ public class ZookeeperMetadataReportFactory extends AbstractMetadataReportFactor
 
     @Override
     public MetadataReport createMetadataReport(URL url) {
+        //创建一个元数据上报组件, 这里真正的元数据上报组件是 ZookeeperMetadataReport
         return new ZookeeperMetadataReport(url, zookeeperTransporter);
     }
 

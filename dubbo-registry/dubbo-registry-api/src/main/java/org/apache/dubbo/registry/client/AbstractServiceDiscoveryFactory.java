@@ -50,6 +50,7 @@ public abstract class AbstractServiceDiscoveryFactory implements ServiceDiscover
     @Override
     public ServiceDiscovery getServiceDiscovery(URL registryURL) {
         String key = registryURL.toServiceStringWithoutResolving();
+        //创建服务发现组件
         return discoveries.computeIfAbsent(key, k -> createDiscovery(registryURL));
     }
 

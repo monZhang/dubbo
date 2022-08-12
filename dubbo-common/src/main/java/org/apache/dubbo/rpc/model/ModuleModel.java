@@ -40,11 +40,13 @@ public class ModuleModel extends ScopeModel {
     private static final Logger logger = LoggerFactory.getLogger(ModuleModel.class);
 
     public static final String NAME = "ModuleModel";
-
+    //与parent 变量一致, 关联是父级model
     private final ApplicationModel applicationModel;
     private ModuleEnvironment moduleEnvironment;
+    //moduleservice仓储服务, 用于保存服务信息
     private ModuleServiceRepository serviceRepository;
     private ModuleConfigManager moduleConfigManager;
+    // 管理部分组件的 初始化,启动,销毁..
     private ModuleDeployer deployer;
 
     public ModuleModel(ApplicationModel applicationModel) {
@@ -80,7 +82,7 @@ public class ModuleModel extends ScopeModel {
         this.moduleConfigManager.initialize();
 
         initModuleExt();
-
+        //执行初始化包含deployer的初始化 DefaultModuleDeployer
         ExtensionLoader<ScopeModelInitializer> initializerExtensionLoader = this.getExtensionLoader(ScopeModelInitializer.class);
         Set<ScopeModelInitializer> initializers = initializerExtensionLoader.getSupportedExtensionInstances();
         for (ScopeModelInitializer initializer : initializers) {

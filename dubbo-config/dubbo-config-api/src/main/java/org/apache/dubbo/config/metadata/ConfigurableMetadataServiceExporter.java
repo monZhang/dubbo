@@ -67,6 +67,7 @@ public class ConfigurableMetadataServiceExporter {
         if (serviceConfig == null || !isExported()) {
             this.serviceConfig = buildServiceConfig();
             // export
+            //发布MetadataService
             serviceConfig.export();
             metadataService.setMetadataURL(serviceConfig.getExportedUrls().get(0));
             if (logger.isInfoEnabled()) {

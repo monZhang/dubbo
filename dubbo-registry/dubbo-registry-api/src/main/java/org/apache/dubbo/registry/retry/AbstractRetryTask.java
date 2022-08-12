@@ -112,6 +112,7 @@ public abstract class AbstractRetryTask implements TimerTask {
             // other thread cancel this timeout or stop the timer.
             return;
         }
+        //默认最大重试次数3次, 超过3次直接返回.
         if (times > retryTimes) {
             // reach the most times of retry.
             logger.warn("Final failed to execute task " + taskName + ", url: " + url + ", retry " + retryTimes + " times.");
@@ -121,6 +122,7 @@ public abstract class AbstractRetryTask implements TimerTask {
             logger.info(taskName + " : " + url);
         }
         try {
+            //执行重试, 最终还是调用注册时使用的方法.
             doRetry(url, registry, timeout);
         } catch (Throwable t) { // Ignore all the exceptions and wait for the next retry
             logger.warn("Failed to execute task " + taskName + ", url: " + url + ", waiting for again, cause:" + t.getMessage(), t);

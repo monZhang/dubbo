@@ -110,6 +110,7 @@ public class RoundRobinLoadBalance extends AbstractLoadBalance {
             }
             long cur = weightedRoundRobin.increaseCurrent();
             weightedRoundRobin.setLastUpdate(now);
+            //选权重最大的一个
             if (cur > maxCurrent) {
                 maxCurrent = cur;
                 selectedInvoker = invoker;

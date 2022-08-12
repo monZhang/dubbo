@@ -135,9 +135,12 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
                 return startFuture;
             }
 
+            //1. 更改moduleDeployer状态为启动中
+            //2. 更改applicationDeployer状态为启动中
             onModuleStarting();
 
             // initialize
+            //先初始化上层applicationDeployer, 然后初始化modelDeployer
             applicationDeployer.initialize();
             initialize();
 
@@ -155,6 +158,7 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
 
             // if no async export/refer services, just set started
             if (asyncExportingFutures.isEmpty() && asyncReferringFutures.isEmpty()) {
+                //deployer组件启动完成
                 onModuleStarted();
             } else {
                 frameworkExecutorRepository.getSharedExecutor().submit(() -> {
@@ -246,8 +250,10 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
     private void onModuleStarted() {
         try {
             if (isStarting()) {
+                //更新DefaultModuleDeployer 启动状态为started
                 setStarted();
                 logger.info(getIdentifier() + " has started.");
+                //通知applicationDeployer启动完成.
                 applicationDeployer.notifyModuleChanged(moduleModel, DeployState.STARTED);
             }
         } finally {

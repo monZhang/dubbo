@@ -127,6 +127,7 @@ public class ModuleServiceRepository {
             if (previous.isPresent()) {
                 return previous.get();
             } else {
+                //保存服务描述信息
                 serviceDescriptors.add(serviceDescriptor);
                 return serviceDescriptor;
             }
