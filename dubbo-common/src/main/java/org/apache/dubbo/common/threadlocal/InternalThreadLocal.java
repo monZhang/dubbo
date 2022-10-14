@@ -35,6 +35,7 @@ public class InternalThreadLocal<V> extends ThreadLocal<V> {
 
     private static final int VARIABLES_TO_REMOVE_INDEX = InternalThreadLocalMap.nextVariableIndex();
 
+    //用于定位本InternalThreadLocal在InternlThreadLocalMap中存储数据的位置(数组结构容器位置)
     private final int index;
 
     public InternalThreadLocal() {
@@ -117,12 +118,13 @@ public class InternalThreadLocal<V> extends ThreadLocal<V> {
     @SuppressWarnings("unchecked")
     @Override
     public final V get() {
+        //获取当前线程持有的map容器
         InternalThreadLocalMap threadLocalMap = InternalThreadLocalMap.get();
         Object v = threadLocalMap.indexedVariable(index);
         if (v != InternalThreadLocalMap.UNSET) {
             return (V) v;
         }
-
+        //容器中不存在当前数据, 那么就执行初始化
         return initialize(threadLocalMap);
     }
 
@@ -143,7 +145,7 @@ public class InternalThreadLocal<V> extends ThreadLocal<V> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-
+        //保存
         threadLocalMap.setIndexedVariable(index, v);
         addToVariablesToRemove(threadLocalMap, this);
         return v;

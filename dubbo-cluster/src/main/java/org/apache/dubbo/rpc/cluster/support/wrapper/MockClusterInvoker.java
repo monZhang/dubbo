@@ -87,22 +87,26 @@ public class MockClusterInvoker<T> implements ClusterInvoker<T> {
         return directory.getInterface();
     }
 
+    // https://dubbo.apache.org/zh/docs/v2.7/user/examples/local-mock/
     @Override
     public Result invoke(Invocation invocation) throws RpcException {
         Result result;
 
         String value = getUrl().getMethodParameter(invocation.getMethodName(), MOCK_KEY, Boolean.FALSE.toString()).trim();
         if (ConfigUtils.isEmpty(value)) {
-            //no mock
+            //默认不开启mock, 直接调用
             result = this.invoker.invoke(invocation);
         } else if (value.startsWith(FORCE_KEY)) {
             if (logger.isWarnEnabled()) {
                 logger.warn("force-mock: " + invocation.getMethodName() + " force-mock enabled , url : " + getUrl());
             }
             //force:direct mock
+            //mock = force 情况直接调用调用mock方法, 返回mock结果
             result = doMockInvoke(invocation, null);
         } else {
             //fail-mock
+            // mock配置配置了但是不等于 false/force 时, 调用失败( 抛出RpcException[网络失败，超时等])则执行mock
+            // 下游抛出的业务异常不进行mock拦截, 直接抛出.
             try {
                 result = this.invoker.invoke(invocation);
 
@@ -135,6 +139,7 @@ public class MockClusterInvoker<T> implements ClusterInvoker<T> {
         Result result;
         Invoker<T> mockInvoker;
 
+        //获取一个mockInvoker todo
         List<Invoker<T>> mockInvokers = selectMockInvoker(invocation);
         if (CollectionUtils.isEmpty(mockInvokers)) {
             mockInvoker = (Invoker<T>) new MockInvoker(getUrl(), directory.getInterface());
@@ -142,6 +147,7 @@ public class MockClusterInvoker<T> implements ClusterInvoker<T> {
             mockInvoker = mockInvokers.get(0);
         }
         try {
+            //执行mock方法得到mock结果
             result = mockInvoker.invoke(invocation);
         } catch (RpcException mockException) {
             if (mockException.isBiz()) {

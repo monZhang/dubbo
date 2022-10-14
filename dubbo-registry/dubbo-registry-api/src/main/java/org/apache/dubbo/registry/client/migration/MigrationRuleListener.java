@@ -138,6 +138,7 @@ public class MigrationRuleListener implements RegistryProtocolListener, Configur
 
     @Override
     public synchronized void process(ConfigChangedEvent event) {
+        // 迁移规则发生变化时, 回调此方法进行刷新
         String rawRule = event.getContent();
         if (StringUtils.isEmpty(rawRule)) {
             // fail back to startup status
@@ -145,11 +146,13 @@ public class MigrationRuleListener implements RegistryProtocolListener, Configur
             //logger.warn("Received empty migration rule, will ignore.");
         }
         try {
+            //将最新规则保存到队列中
             ruleQueue.put(rawRule);
         } catch (InterruptedException e) {
             logger.error("Put rawRule to rule management queue failed. rawRule: " + rawRule, e);
         }
 
+        //首次调用时启动一个单线程的线程池, 将队列中的任务去取出并执行.
         if (executorSubmit.compareAndSet(false, true)) {
             ruleMigrationFuture = ruleManageExecutor.submit(() -> {
                 while (true) {
@@ -176,6 +179,7 @@ public class MigrationRuleListener implements RegistryProtocolListener, Configur
                         setRawRule(rule);
 
                         if (CollectionUtils.isNotEmptyMap(handlers)) {
+                            //创建一个固定线程池将每一个MigrationInvoker使用新的rule刷新一次
                             ExecutorService executorService = Executors.newFixedThreadPool(100, new NamedThreadFactory("Dubbo-Invoker-Migrate"));
                             List<Future<?>> migrationFutures = new ArrayList<>(handlers.size());
                             handlers.forEach((_key, handler) -> {
@@ -188,6 +192,7 @@ public class MigrationRuleListener implements RegistryProtocolListener, Configur
                             Throwable migrationException = null;
                             for (Future<?> future : migrationFutures) {
                                 try {
+                                    //等待每个任务执行完成
                                     future.get();
                                 } catch (InterruptedException ie) {
                                     logger.warn("Interrupted while waiting for migration async task to finish.");
@@ -198,6 +203,7 @@ public class MigrationRuleListener implements RegistryProtocolListener, Configur
                             if (migrationException != null) {
                                 logger.error("Migration async task failed.", migrationException);
                             }
+                            //关闭线程池.
                             executorService.shutdown();
                         }
                     } catch (Throwable t) {
@@ -235,6 +241,7 @@ public class MigrationRuleListener implements RegistryProtocolListener, Configur
 
     @Override
     public void onRefer(RegistryProtocol registryProtocol, ClusterInvoker<?> invoker, URL consumerUrl, URL registryURL) {
+        //获取特定迁移规则的处理器
         MigrationRuleHandler<?> migrationRuleHandler = handlers.computeIfAbsent((MigrationInvoker<?>) invoker, _key -> {
             ((MigrationInvoker<?>) invoker).setMigrationRuleListener(this);
             return new MigrationRuleHandler<>((MigrationInvoker<?>) invoker, consumerUrl);

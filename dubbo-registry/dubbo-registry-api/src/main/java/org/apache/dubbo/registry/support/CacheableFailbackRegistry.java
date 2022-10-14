@@ -173,6 +173,7 @@ public abstract class CacheableFailbackRegistry extends FailbackRegistry {
             if (CollectionUtils.isNotEmpty(providers)) {
                 urls = toUrlsWithoutEmpty(consumer, providers);
             } else {
+                //provider节点下无内容, 清空本地缓存
                 // clear cache on empty notification: unsubscribe or provider offline
                 evictURLCache(consumer);
             }

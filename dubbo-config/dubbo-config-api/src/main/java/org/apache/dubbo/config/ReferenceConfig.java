@@ -257,8 +257,8 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
             }
 
             // init serviceMetadata
+            //初始化consumer元数据
             initServiceMetadata(consumer);
-
             serviceMetadata.setServiceType(getServiceInterfaceClass());
             // TODO, uncomment this line once service key is unified
             serviceMetadata.setServiceKey(URL.buildKey(interfaceName, group, version));
@@ -275,16 +275,14 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
             } else {
                 serviceDescriptor = repository.registerService(interfaceClass);
             }
-            consumerModel = new ConsumerModel(serviceMetadata.getServiceKey(), proxy, serviceDescriptor,
-                getScopeModel(), serviceMetadata, createAsyncMethodInfo(), interfaceClassLoader);
-
+            consumerModel = new ConsumerModel(serviceMetadata.getServiceKey(), proxy, serviceDescriptor, getScopeModel(), serviceMetadata, createAsyncMethodInfo(), interfaceClassLoader);
             // Compatible with dependencies on ServiceModel#getReferenceConfig() , and will be removed in a future version.
             consumerModel.setConfig(this);
-
             repository.registerConsumer(consumerModel);
 
             serviceMetadata.getAttachments().putAll(referenceParameters);
 
+            //创建一个面向远程调用的代理对象, 当代理对象的方法被被调用时通过网络调用服务提供者对外发布的接口并返回结果
             ref = createProxy(referenceParameters);
 
             serviceMetadata.setTarget(ref);
@@ -294,6 +292,7 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
             consumerModel.setProxyObject(ref);
             consumerModel.initMethodModels();
 
+            //校验依赖的服务提供者是否可用, 如果不可用直接异常退出, 默认开启
             checkInvokerAvailable();
         } catch (Throwable t) {
             try {
@@ -408,10 +407,16 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
     @SuppressWarnings({"unchecked"})
     private T createProxy(Map<String, String> referenceParameters) {
         if (shouldJvmRefer(referenceParameters)) {
+            // 同一个jvm内部且满足本地调用条件的话直接调用本地发布的exporter创建invoker
+            // 本地调用也会使用dubbo对应的 cluster filter
             createInvokerForLocal(referenceParameters);
         } else {
+            // 非本地调用情况又分两种:
+            // 1. 点对点远程调用
+            // 2. 正常情况下的远程调用
             urls.clear();
             if (StringUtils.isNotEmpty(url)) {
+                // 指定了要调用的url, 点对点调用场景
                 // user specified URL, could be peer-to-peer address, or register center's address.
                 parseUrl(referenceParameters);
             } else {
@@ -420,6 +425,7 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
                     aggregateUrlFromRegistry(referenceParameters);
                 }
             }
+            //创建面向远程调用的invoker
             createInvokerForRemote();
         }
 
@@ -429,13 +435,14 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
                     " it's GenericService reference" : " it's not GenericService reference"));
         }
 
-        URL consumerUrl = new ServiceConfigURL(CONSUMER_PROTOCOL, referenceParameters.get(REGISTER_IP_KEY), 0,
-            referenceParameters.get(INTERFACE_KEY), referenceParameters);
+        //构建consumer服务元数据信息并推送到元数据中心以及本地文件缓存.
+        URL consumerUrl = new ServiceConfigURL(CONSUMER_PROTOCOL, referenceParameters.get(REGISTER_IP_KEY), 0, referenceParameters.get(INTERFACE_KEY), referenceParameters);
         consumerUrl = consumerUrl.setScopeModel(getScopeModel());
         consumerUrl = consumerUrl.setServiceModel(consumerModel);
         MetadataUtils.publishServiceDefinition(consumerUrl, consumerModel.getServiceModel(), getApplicationModel());
 
         // create service proxy
+        // 使用前面创建的面向"本地/远程"调用的invoker创建代理对象.
         return (T) proxyFactory.getProxy(invoker, ProtocolUtils.isGeneric(generic));
     }
 
@@ -449,11 +456,23 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
         URL url = new ServiceConfigURL(LOCAL_PROTOCOL, LOCALHOST_VALUE, 0, interfaceClass.getName(), referenceParameters);
         url = url.setScopeModel(getScopeModel());
         url = url.setServiceModel(consumerModel);
+
+        //通过InjvmProtocol创建InjvmInvoker
         Invoker<?> withFilter = protocolSPI.refer(interfaceClass, url);
+
         // Local Invoke ( Support Cluster Filter / Filter )
+        // 对invoker进行增强使之支持filter相关组件
+        //1.创建一个静态目录, 将jvmInvoker写入
         List<Invoker<?>> invokers = new ArrayList<>();
         invokers.add(withFilter);
-        invoker = Cluster.getCluster(url.getScopeModel(), Cluster.DEFAULT).join(new StaticDirectory(url, invokers), true);
+        //创建静态服务目录, 服务目录的路由组件routeChain没有进行初始化
+        StaticDirectory directory = new StaticDirectory(url, invokers);
+
+        //2. 对invoker进行增强 ( FailoverCluster.join() )
+        //通过Cluster工厂获取具体的集群容错策略, 并创建有相应应功能的invoker
+        //默认使用FailoverCluster (包装成MockClusterWrapper)创建 FailoverClusterInvoker (被包装成MockClusterInvoker)
+        //最后对FailoverClusterInvoker添加clusterFilter过滤器链, 拦截器链
+        invoker = Cluster.getCluster(url.getScopeModel(), Cluster.DEFAULT).join(directory, true);
 
         if (logger.isInfoEnabled()) {
             logger.info("Using in jvm service " + interfaceClass.getName());
@@ -517,11 +536,13 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
     private void createInvokerForRemote() {
         if (urls.size() == 1) {
             URL curUrl = urls.get(0);
+            //创建面向远程调用的invoker
             invoker = protocolSPI.refer(interfaceClass, curUrl);
             if (!UrlUtils.isRegistry(curUrl)) {
                 List<Invoker<?>> invokers = new ArrayList<>();
                 invokers.add(invoker);
-                invoker = Cluster.getCluster(scopeModel, Cluster.DEFAULT).join(new StaticDirectory(curUrl, invokers), true);
+                StaticDirectory directory = new StaticDirectory(curUrl, invokers);
+                invoker = Cluster.getCluster(scopeModel, Cluster.DEFAULT).join(directory, true);
             }
         } else {
             List<Invoker<?>> invokers = new ArrayList<>();
@@ -649,12 +670,14 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
         if (isInjvm() == null) {
             // if an url is specified, don't do local reference
             if (StringUtils.isNotEmpty(url)) {
+                //点对点调用时不支持本地调用
                 isJvmRefer = false;
             } else {
                 // by default, reference local service if there is
                 isJvmRefer = InjvmProtocol.getInjvmProtocol(getScopeModel()).isInjvmRefer(tmpUrl);
             }
         } else {
+            //强制指定:  injvm = true/false
             isJvmRefer = isInjvm();
         }
         return isJvmRefer;

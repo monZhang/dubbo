@@ -329,9 +329,11 @@ public abstract class AbstractClusterInvoker<T> implements ClusterInvoker<T> {
 //        }
 
         InvocationProfilerUtils.enterDetailProfiler(invocation, () -> "Router route.");
+        // 从服务目录获取invoker, 获取时会经过 路由链过滤 拿到符合所有路由规则的invoker列表
         List<Invoker<T>> invokers = list(invocation);
         InvocationProfilerUtils.releaseDetailProfiler(invocation);
 
+        //获取负载均衡策略 默认random
         LoadBalance loadbalance = initLoadBalance(invokers, invocation);
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
 
@@ -369,14 +371,18 @@ public abstract class AbstractClusterInvoker<T> implements ClusterInvoker<T> {
     }
 
     protected Result invokeWithContext(Invoker<T> invoker, Invocation invocation) {
+        //将使用的invoker保存到RpcContext中
         setContext(invoker);
         Result result;
         try {
             if (ProfilerSwitch.isEnableSimpleProfiler()) {
                 InvocationProfilerUtils.enterProfiler(invocation, "Invoker invoke. Target Address: " + invoker.getUrl().getAddress());
             }
+            //集群层面的过滤, 路由, lb 都应经操作完成
+            //这里 到了调用DubboInvoker的时候 (DubboInvoker包装类)
             result = invoker.invoke(invocation);
         } finally {
+            //将使用的invoker从RpcContext中清理掉
             clearContext(invoker);
             InvocationProfilerUtils.releaseSimpleProfiler(invocation);
         }

@@ -108,7 +108,8 @@ public class InjvmProtocol extends AbstractProtocol {
             //泛化调用不支持 本地调用
             return false;
         } else if (getExporter(exporterMap, url) != null) {
-            //本地存在exporter情况
+            //通过url与本地发布后保存的exporter进行对比 如果存在匹配上的exporter那么说明被调用的服务在本地存在,可以进行本地调用
+            //存在对应的本地发布的exporter的情况, 排除掉广播模式调用 即可使用本地调用
 
             // Broadcast cluster means that multiple machines will be called,
             // which is not converted to injvm protocol at this time.

@@ -31,6 +31,10 @@ import org.apache.dubbo.rpc.Invoker;
  *
  * @param <T>
  */
+//调用方consumer面向集群层面的invoker
+// clusterInvoker包含一组面向具体机器的的invoker, 这些Invoker保存在一个目录中并映射到一个注册表
+// clusterInvoekr具有LB, HA 能力
+// 对于多注册中心场景一个clusterInvoker包含多个ClusterInvoker, 每个子clusterInvoker代表一个注册中心中的invoker
 public interface ClusterInvoker<T> extends Invoker<T> {
 
     URL getRegistryUrl();

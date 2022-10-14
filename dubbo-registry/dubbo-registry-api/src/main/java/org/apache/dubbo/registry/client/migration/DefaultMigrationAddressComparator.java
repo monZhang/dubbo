@@ -40,6 +40,14 @@ public class DefaultMigrationAddressComparator implements MigrationAddressCompar
 
     private Map<String, Map<String, Integer>> serviceMigrationData = new ConcurrentHashMap<>();
 
+    /**
+     *
+     * @param newInvoker  面向服务的invoker
+     * @param oldInvoker  面向接口的invoker
+     * @param rule
+     * @param <T>
+     * @return
+     */
     @Override
     public <T> boolean shouldMigrate(ClusterInvoker<T> newInvoker, ClusterInvoker<T> oldInvoker, MigrationRule rule) {
         Map<String, Integer> migrationData = serviceMigrationData.computeIfAbsent(oldInvoker.getUrl().getDisplayServiceKey(), _k -> new ConcurrentHashMap<>());
@@ -57,9 +65,9 @@ public class DefaultMigrationAddressComparator implements MigrationAddressCompar
             return true;
         }
 
+        // 服务级, 接口级 invoker数量
         int newAddressSize = getAddressSize(newInvoker);
         int oldAddressSize = getAddressSize(oldInvoker);
-
         migrationData.put(OLD_ADDRESS_SIZE, oldAddressSize);
         migrationData.put(NEW_ADDRESS_SIZE, newAddressSize);
 
@@ -79,6 +87,7 @@ public class DefaultMigrationAddressComparator implements MigrationAddressCompar
 
         logger.info("serviceKey:" + oldInvoker.getUrl().getServiceKey() + " Instance address size " + newAddressSize + ", interface address size " + oldAddressSize + ", threshold " + threshold);
 
+        //没得选的情况下有哪个走哪个
         if (newAddressSize != 0 && oldAddressSize == 0) {
             return true;
         }
@@ -86,6 +95,7 @@ public class DefaultMigrationAddressComparator implements MigrationAddressCompar
             return false;
         }
 
+        // 实例地址数量 / 接口地址数量 >= 阈值
         if (((float) newAddressSize / (float) oldAddressSize) >= threshold) {
             return true;
         }

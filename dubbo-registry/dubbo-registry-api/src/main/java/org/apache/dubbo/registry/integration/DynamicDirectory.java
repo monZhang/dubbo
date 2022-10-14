@@ -135,8 +135,9 @@ public abstract class DynamicDirectory<T> extends AbstractDirectory<T> implement
         if (StringUtils.isEmpty(url.getServiceKey())) {
             throw new IllegalArgumentException("registry serviceKey is null.");
         }
-
+        //是否要注册, register配置
         this.shouldRegister = !ANY_VALUE.equals(url.getServiceInterface()) && url.getParameter(REGISTER_KEY, true);
+        //是否精简注册信息
         this.shouldSimplified = url.getParameter(SIMPLIFIED_KEY, false);
 
         this.serviceType = serviceType;
@@ -177,9 +178,11 @@ public abstract class DynamicDirectory<T> extends AbstractDirectory<T> implement
 
     public void subscribe(URL url) {
         setSubscribeUrl(url);
+        //请求注册中心订阅注册的服务, 获取到服务列表后会回调本对象实例的notify方法(子类中实现)
         registry.subscribe(url, this);
     }
 
+    //服务退订
     public void unSubscribe(URL url) {
         setSubscribeUrl(null);
         registry.unsubscribe(url, this);
@@ -200,6 +203,7 @@ public abstract class DynamicDirectory<T> extends AbstractDirectory<T> implement
         }
 
         try {
+            //直接对所有的invokers进行路由, 这里的invokers是一个动态列表会随时发生变化,
             // Get invokers from cache, only runtime routers will be executed.
             List<Invoker<T>> result = routerChain.route(getConsumerUrl(), invokers, invocation);
             return result == null ? BitList.emptyList() : result;
@@ -279,6 +283,7 @@ public abstract class DynamicDirectory<T> extends AbstractDirectory<T> implement
         if (isDestroyed() || this.forbidden) {
             return false;
         }
+        //存在一个连接中可读写的invoker既判定可用
         return CollectionUtils.isNotEmpty(getValidInvokers())
             && getValidInvokers().stream().anyMatch(Invoker::isAvailable);
     }

@@ -81,14 +81,14 @@ public class RouterChain<T> {
     public static <T> RouterChain<T> buildChain(Class<T> interfaceClass, URL url) {
         ModuleModel moduleModel = url.getOrDefaultModuleModel();
 
-        List<RouterFactory> extensionFactories = moduleModel.getExtensionLoader(RouterFactory.class)
-            .getActivateExtension(url, ROUTER_KEY);
-
+        //获取路由集合, 默认实现是空
+        List<RouterFactory> extensionFactories = moduleModel.getExtensionLoader(RouterFactory.class).getActivateExtension(url, ROUTER_KEY);
         List<Router> routers = extensionFactories.stream()
             .map(factory -> factory.getRouter(url))
             .sorted(Router::compareTo)
             .collect(Collectors.toList());
 
+        //获取状态路由集
         List<StateRouter<T>> stateRouters = moduleModel
             .getExtensionLoader(StateRouterFactory.class)
             .getActivateExtension(url, ROUTER_KEY)
@@ -96,17 +96,18 @@ public class RouterChain<T> {
             .map(factory -> factory.getRouter(interfaceClass, url))
             .collect(Collectors.toList());
 
-
+        //路由快速失败, 默认true
         boolean shouldFailFast = Boolean.parseBoolean(ConfigurationUtils.getProperty(moduleModel, Constants.SHOULD_FAIL_FAST_KEY, "true"));
 
         RouterSnapshotSwitcher routerSnapshotSwitcher = ScopeModelUtil.getFrameworkModel(moduleModel).getBeanFactory().getBean(RouterSnapshotSwitcher.class);
-
+        //创建路由器链
         return new RouterChain<>(routers, stateRouters, shouldFailFast, routerSnapshotSwitcher);
     }
 
     public RouterChain(List<Router> routers, List<StateRouter<T>> stateRouters, boolean shouldFailFast, RouterSnapshotSwitcher routerSnapshotSwitcher) {
         initWithRouters(routers);
 
+        //创建状态路由链 (封装成链表结构)
         initWithStateRouters(stateRouters);
 
         this.shouldFailFast = shouldFailFast;
@@ -114,6 +115,7 @@ public class RouterChain<T> {
     }
 
     private void initWithStateRouters(List<StateRouter<T>> stateRouters) {
+        //创建最后一个节点, 最后一个节点没有下一个节点的引用
         StateRouter<T> stateRouter = TailStateRouter.getInstance();
         for (int i = stateRouters.size() - 1; i >= 0; i--) {
             StateRouter<T> nextStateRouter = stateRouters.get(i);

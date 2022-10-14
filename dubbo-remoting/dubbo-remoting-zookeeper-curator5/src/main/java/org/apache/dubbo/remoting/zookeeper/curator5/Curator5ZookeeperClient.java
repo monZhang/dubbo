@@ -378,6 +378,8 @@ public class Curator5ZookeeperClient extends AbstractZookeeperClient<Curator5Zoo
             }
 
             if (childListener != null) {
+                //zk节点发生变化, 回调方法被触发执行, 重新创建一个新的监听器(拿到最新内容, 并准备好下次监听回调)
+                //基于最新节点内容 进行处理
                 childListener.childChanged(path, client.getChildren().usingWatcher(this).forPath(path));
             }
         }

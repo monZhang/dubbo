@@ -43,8 +43,15 @@ import static org.apache.dubbo.common.constants.CommonConstants.REFERENCE_FILTER
 public abstract class AbstractCluster implements Cluster {
 
     private <T> Invoker<T> buildClusterInterceptors(AbstractClusterInvoker<T> clusterInvoker) {
-//        AbstractClusterInvoker<T> last = clusterInvoker;
-        AbstractClusterInvoker<T> last = buildInterceptorInvoker(new ClusterFilterInvoker<>(clusterInvoker));
+
+        // https://github.com/apache/dubbo/issues/7382
+        // 对invoker进行增强, 使其具有clusterFilter过滤器链功能, 增强后被包装成 ClusterFilterInvoker
+        // ClusterCallbackRegistrationInvoker -> clusterFilterChain -> originalClusterInvoker
+        ClusterFilterInvoker<T> clusterFilterInvoker = new ClusterFilterInvoker<>(clusterInvoker);
+
+        //进一步包装成具有拦截器功能的invoker, 再次增强filterInvoker
+        //被包装成 InvocationInterceptorInvoker
+        AbstractClusterInvoker<T> last = buildInterceptorInvoker(clusterFilterInvoker);
 
         if (Boolean.parseBoolean(ConfigurationUtils.getProperty(clusterInvoker.getDirectory().getConsumerUrl().getScopeModel(), CLUSTER_INTERCEPTOR_COMPATIBLE_KEY, "false"))) {
             return build27xCompatibleClusterInterceptors(clusterInvoker, last);
@@ -54,10 +61,15 @@ public abstract class AbstractCluster implements Cluster {
 
     @Override
     public <T> Invoker<T> join(Directory<T> directory, boolean buildFilterChain) throws RpcException {
+        //子类创建具有特定集群容错策略的invoker
+        AbstractClusterInvoker<T> clusterInvoker = doJoin(directory);
         if (buildFilterChain) {
-            return buildClusterInterceptors(doJoin(directory));
+            //构建过滤器链包装 invoker
+            //ClusterFilterInvoker -> FailoverClusterInvoker
+            // -> InvocationInterceptorInvoker -> ClusterCallbackRegistrationInvoker -> ClusterCallbackRegistrationInvoker -> clusterFilterChain ->
+            return buildClusterInterceptors(clusterInvoker);
         } else {
-            return doJoin(directory);
+            return clusterInvoker;
         }
     }
 
@@ -75,12 +87,15 @@ public abstract class AbstractCluster implements Cluster {
         private ClusterInvoker<T> filterInvoker;
 
         public ClusterFilterInvoker(AbstractClusterInvoker<T> invoker) {
+            //获取clusterFilter过滤器链构造器
             List<FilterChainBuilder> builders = ScopeModelUtil.getApplicationModel(invoker.getUrl().getScopeModel()).getExtensionLoader(FilterChainBuilder.class).getActivateExtensions();
             if (CollectionUtils.isEmpty(builders)) {
                 filterInvoker = invoker;
             } else {
                 ClusterInvoker<T> tmpInvoker = invoker;
                 for (FilterChainBuilder builder : builders) {
+                    //使用FilterChain构造器构建clusterFilter链
+                    //构建后的ClusterFilterChain使用 ClusterCallbackRegistrationInvoker 包装后返回
                     tmpInvoker = builder.buildClusterInvokerChain(tmpInvoker, REFERENCE_FILTER_KEY, CommonConstants.CONSUMER);
                 }
                 filterInvoker = tmpInvoker;

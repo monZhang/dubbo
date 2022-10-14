@@ -85,6 +85,7 @@ public class MergeableClusterInvoker<T> extends AbstractClusterInvoker<T> {
             returnType = null;
         }
 
+        //循环提交调用每个provider任务
         Map<String, Result> results = new HashMap<>();
         for (final Invoker<T> invoker : invokers) {
             RpcInvocation subInvocation = new RpcInvocation(invocation, invoker);
@@ -92,10 +93,8 @@ public class MergeableClusterInvoker<T> extends AbstractClusterInvoker<T> {
             results.put(invoker.getUrl().getServiceKey(), invokeWithContext(invoker, subInvocation));
         }
 
-        Object result;
-
+        //等待所有provider返回结果
         List<Result> resultList = new ArrayList<>(results.size());
-
         for (Map.Entry<String, Result> entry : results.entrySet()) {
             Result asyncResult = entry.getValue();
             try {
@@ -111,16 +110,18 @@ public class MergeableClusterInvoker<T> extends AbstractClusterInvoker<T> {
             }
         }
 
+        //结果为空, void, 只有一个情况, 直接返回不需要merge
         if (resultList.isEmpty()) {
             return AsyncRpcResult.newDefaultAsyncResult(invocation);
         } else if (resultList.size() == 1) {
             return AsyncRpcResult.newDefaultAsyncResult(resultList.get(0).getValue(), invocation);
         }
-
         if (returnType == void.class) {
             return AsyncRpcResult.newDefaultAsyncResult(invocation);
         }
 
+        //对需要merge的结果进行merge
+        Object result;
         if (merger.startsWith(".")) {
             merger = merger.substring(1);
             Method method;

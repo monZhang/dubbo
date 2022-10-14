@@ -57,6 +57,7 @@ public class HeartbeatHandler extends AbstractChannelHandlerDelegate {
 
     @Override
     public void sent(Channel channel, Object message) throws RemotingException {
+        //设置最后一次写操作事件, 心跳本质.
         setWriteTimestamp(channel);
         handler.sent(channel, message);
     }

@@ -107,8 +107,10 @@ public abstract class AbstractZookeeperClient<TargetDataListener, TargetChildLis
 
     @Override
     public List<String> addChildListener(String path, final ChildListener listener) {
+        //对listener进行包装, 转换成curator框架的可以识别的watcher类型
         ConcurrentMap<ChildListener, TargetChildListener> listeners = childListeners.computeIfAbsent(path, k -> new ConcurrentHashMap<>());
         TargetChildListener targetListener = listeners.computeIfAbsent(listener, k -> createTargetChildListener(path, k));
+        //监听器真正的绑定到zk节点
         return addTargetChildListener(path, targetListener);
     }
 

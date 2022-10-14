@@ -47,12 +47,14 @@ public interface Directory<T> extends Node {
      *
      * @return invokers
      */
+    //根据调用参数invocation筛选出有哪些可用的invoker
     List<Invoker<T>> list(Invocation invocation) throws RpcException;
 
     /**
      * list invokers
      * include all invokers from registry
      */
+    //获取注册中心包含的所有invoker
     List<Invoker<T>> getAllInvokers();
 
     URL getConsumerUrl();
@@ -77,6 +79,7 @@ public interface Directory<T> extends Node {
      *
      * @param invoker invoker to invalidate
      */
+    // 将失效的invoker添加到重连列表中, 重连成功或者地址刷新后从重连列表删除
     void addInvalidateInvoker(Invoker<T> invoker);
 
     /**
@@ -86,6 +89,7 @@ public interface Directory<T> extends Node {
      *
      * @param invoker invoker to invalidate
      */
+    //禁用invoker
     void addDisabledInvoker(Invoker<T> invoker);
 
     /**
@@ -93,6 +97,7 @@ public interface Directory<T> extends Node {
      *
      * @param invoker invoker to invalidate
      */
+    //恢复禁用
     void recoverDisabledInvoker(Invoker<T> invoker);
 
     default boolean isNotificationReceived() {

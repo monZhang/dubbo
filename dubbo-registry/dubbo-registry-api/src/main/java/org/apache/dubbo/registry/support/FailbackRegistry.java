@@ -46,13 +46,15 @@ import static org.apache.dubbo.registry.Constants.REGISTRY_RETRY_PERIOD_KEY;
 public abstract class FailbackRegistry extends AbstractRegistry {
 
     /*  retry task map */
-
+    //注册失败任务
     private final ConcurrentMap<URL, FailedRegisteredTask> failedRegistered = new ConcurrentHashMap<>();
-
+    //下线失败任务
     private final ConcurrentMap<URL, FailedUnregisteredTask> failedUnregistered = new ConcurrentHashMap<>();
 
+    //订阅失败任务
     private final ConcurrentMap<Holder, FailedSubscribedTask> failedSubscribed = new ConcurrentHashMap<>();
 
+    //退订失败任务
     private final ConcurrentMap<Holder, FailedUnsubscribedTask> failedUnsubscribed = new ConcurrentHashMap<>();
 
     /**
@@ -147,11 +149,13 @@ public abstract class FailbackRegistry extends AbstractRegistry {
     }
 
     public void removeFailedSubscribed(URL url, NotifyListener listener) {
+        //移除当前url相关的订阅失败任务
         Holder h = new Holder(url, listener);
         FailedSubscribedTask f = failedSubscribed.remove(h);
         if (f != null) {
             f.cancel();
         }
+        //移除当前url相关的退订失败任务
         removeFailedUnsubscribed(url, listener);
     }
 
@@ -296,9 +300,11 @@ public abstract class FailbackRegistry extends AbstractRegistry {
     @Override
     public void subscribe(URL url, NotifyListener listener) {
         super.subscribe(url, listener);
+        //清理和本url相关的订阅失败的任务
         removeFailedSubscribed(url, listener);
         try {
             // Sending a subscription request to the server side
+            //向注册中心发起订阅请求
             doSubscribe(url, listener);
         } catch (Exception e) {
             Throwable t = e;

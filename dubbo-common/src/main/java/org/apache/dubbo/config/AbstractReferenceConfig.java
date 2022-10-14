@@ -67,6 +67,7 @@ public abstract class AbstractReferenceConfig extends AbstractInterfaceConfig {
 
     protected String reconnect;
 
+    //粘滞调用, 如果开启则倾向于调用先前调用过的服务提供者
     protected Boolean sticky;
 
     /**

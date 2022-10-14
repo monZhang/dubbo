@@ -58,6 +58,7 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
         List<Invoker<T>> copyInvokers = invokers;
         checkInvokers(copyInvokers, invocation);
         String methodName = RpcUtils.getMethodName(invocation);
+        //计算重试次数, 默认总共执行三次 (本身一次, 重试两次)
         int len = calculateInvokeTimes(methodName);
         // retry loop.
         RpcException le = null; // last exception.
@@ -77,6 +78,7 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
             RpcContext.getServiceContext().setInvokers((List) invoked);
             boolean success = false;
             try {
+                //使用lb策略筛选出的invoker执行后续逻辑
                 Result result = invokeWithContext(invoker, invocation);
                 if (le != null && logger.isWarnEnabled()) {
                     logger.warn("Although retry the method " + methodName
@@ -92,11 +94,13 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 success = true;
                 return result;
             } catch (RpcException e) {
+                //业务异常直接抛出,不进行重试
                 if (e.isBiz()) { // biz exception.
                     throw e;
                 }
                 le = e;
             } catch (Throwable e) {
+                //系统相关异常,循环重试 (如果重试没有达到最大次数)
                 le = new RpcException(e.getMessage(), e);
             } finally {
                 if (!success) {

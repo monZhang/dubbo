@@ -60,7 +60,9 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
     private ConsumerModel consumerModel;
     private FrameworkStatusReportService reportService;
 
+    //面向接口调用invoker
     private volatile ClusterInvoker<T> invoker;
+    //面向服务调用invoker
     private volatile ClusterInvoker<T> serviceDiscoveryInvoker;
     private volatile ClusterInvoker<T> currentAvailableInvoker;
     private volatile MigrationStep step;
@@ -73,6 +75,7 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
                             Class<T> type,
                             URL url,
                             URL consumerUrl) {
+        //invoker, serviceDiscoverInvoker 两个重要的invoker在这里新建对象时没有初始化
         this(null, null, registryProtocol, cluster, registry, type, url, consumerUrl);
     }
 
@@ -240,11 +243,16 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
     @Override
     public void migrateToApplicationFirstInvoker(MigrationRule newRule) {
         CountDownLatch latch = new CountDownLatch(0);
+        //初始化invoker (接口级订阅)
         refreshInterfaceInvoker(latch);
+        //初始化serviceDiscoveryInvoker (应用级订阅)
         refreshServiceDiscoveryInvoker(latch);
 
         // directly calculate preferred invoker, will not wait until address notify
         // calculation will re-occurred when address notify later
+        //是面向接口的invoker 还是面向服务的ServiceDiscoveryInvoker
+        //将计算结果赋值给currentAvailableInvoker, 当真正调用时使用
+        //注: 真正调用时可能会重新计算 currentAvailableInvoker, 取决于迁移策略.
         calcPreferredInvoker(newRule);
     }
 
@@ -273,11 +281,13 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
         if (currentAvailableInvoker != null) {
             if (step == APPLICATION_FIRST) {
                 // call ratio calculation based on random value
+                //生成一个随机数, 如果随机数大于晋升值则不晋升, 使用接口级调用
                 if (promotion < 100 && ThreadLocalRandom.current().nextDouble(100) > promotion) {
                     // fall back to interface mode
                     return invoker.invoke(invocation);
                 }
                 // check if invoker available for each time
+                //优先使用ServiceDiscoveryInvoekr, 如果不可用降级使用接口模式调用
                 return decideInvoker().invoke(invocation);
             }
             return currentAvailableInvoker.invoke(invocation);
@@ -433,6 +443,7 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
             if (serviceDiscoveryInvoker != null) {
                 serviceDiscoveryInvoker.destroy();
             }
+            //创建ServiceDiscoveryInvoker
             serviceDiscoveryInvoker = registryProtocol.getServiceDiscoveryInvoker(cluster, registry, type, url);
         }
         setListener(serviceDiscoveryInvoker, () -> {
@@ -448,6 +459,7 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
     }
 
     protected void refreshInterfaceInvoker(CountDownLatch latch) {
+        //将invoker中动态目录中的监听器清空
         clearListener(invoker);
         if (needRefresh(invoker)) {
             if (logger.isDebugEnabled()) {
@@ -457,15 +469,18 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
             if (invoker != null) {
                 invoker.destroy();
             }
+            //创建invoker
             invoker = registryProtocol.getInvoker(cluster, registry, type, url);
         }
+
+        //给invoker中的动态目录设置监听器,
         setListener(invoker, () -> {
             latch.countDown();
             if (reportService.hasReporter()) {
-                reportService.reportConsumptionStatus(
-                    reportService.createConsumptionReport(consumerUrl.getServiceInterface(), consumerUrl.getVersion(), consumerUrl.getGroup(), "interface"));
+                reportService.reportConsumptionStatus(reportService.createConsumptionReport(consumerUrl.getServiceInterface(), consumerUrl.getVersion(), consumerUrl.getGroup(), "interface"));
             }
             if (step == APPLICATION_FIRST) {
+                //计算首选的invoker
                 calcPreferredInvoker(rule);
             }
         });

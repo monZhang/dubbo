@@ -96,11 +96,13 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
     /**
      * Valid Invoker. All invokers from registry exclude unavailable and disabled invokers.
      */
+    //排除掉不可用和禁用的invoker后剩余全部invoker列表
     private volatile BitList<Invoker<T>> validInvokers = BitList.emptyList();
 
     /**
      * Waiting to reconnect invokers.
      */
+    //等待重链的invoker列表
     protected volatile List<Invoker<T>> invokersToReconnect = new CopyOnWriteArrayList<>();
 
     /**
@@ -110,6 +112,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
 
     private final Semaphore checkConnectivityPermit = new Semaphore(1);
 
+    //对于失效的连接进行重连激活的线程池
     private final ScheduledExecutorService connectivityExecutor;
 
     private volatile ScheduledFuture<?> connectivityCheckFuture;
@@ -117,6 +120,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
     /**
      * The max count of invokers for each reconnect task select to try to reconnect.
      */
+    //每一批重连任务的最大数量
     private final int reconnectTaskTryCount;
 
     /**
@@ -168,12 +172,13 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
             }
             this.consumerUrl = consumerUrlFrom.addParameters(queryMap);
         }
-
+        //初始化连接线程池, 该连接池用于失效invoker重连, 任务连接重试间隔1s, 最大重试次数10次
         this.connectivityExecutor = applicationModel.getFrameworkModel().getBeanFactory()
             .getBean(FrameworkExecutorRepository.class).getConnectivityScheduledExecutor();
         Configuration configuration = ConfigurationUtils.getGlobalConfiguration(url.getOrDefaultModuleModel());
         this.reconnectTaskTryCount = configuration.getInt(RECONNECT_TASK_TRY_COUNT, DEFAULT_RECONNECT_TASK_TRY_COUNT);
         this.reconnectTaskPeriod = configuration.getInt(RECONNECT_TASK_PERIOD, DEFAULT_RECONNECT_TASK_PERIOD);
+        //设置路由链
         setRouterChain(routerChain);
     }
 
@@ -191,6 +196,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
             availableInvokers = invokers.clone();
         }
 
+        //根据调用参数 invocation从所有可用的invoker中筛选
         List<Invoker<T>> routedResult = doList(availableInvokers, invocation);
         if (routedResult.isEmpty()) {
             logger.warn("No provider available after connectivity filter for the service " + getConsumerUrl().getServiceKey()
@@ -248,6 +254,9 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
         // do nothing by default
     }
 
+
+    //添加invoker到重连任务列表中,并启动连接可用性检查任务
+    //
     @Override
     public void addInvalidateInvoker(Invoker<T> invoker) {
         // 1. remove this invoker from validInvokers list, this invoker will not be listed in the next time
@@ -259,6 +268,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
         }
     }
 
+    // 仅仅只是做了服务是否重连的检查处理, 无真正的重连操作.
     public void checkConnectivity() {
         // try to submit task, to ensure there is only one task at most for each directory
         if (checkConnectivityPermit.tryAcquire()) {
@@ -276,6 +286,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
                     if (invokersToReconnect.size() < reconnectTaskTryCount) {
                         invokersToTry.addAll(invokersToReconnect);
                     } else {
+                        //超过一次最大处理数量 随机取最大数量个invoker 进行处理
                         for (int i = 0; i < reconnectTaskTryCount; i++) {
                             Invoker<T> tInvoker = invokersToReconnect.get(ThreadLocalRandom.current().nextInt(invokersToReconnect.size()));
                             if (!invokersToTry.contains(tInvoker)) {
@@ -289,9 +300,11 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
                     for (Invoker<T> invoker : invokersToTry) {
                         if (invokers.contains(invoker)) {
                             if (invoker.isAvailable()) {
+                                //总列表(与registry保持一致)中不可用, 移除
                                 needDeleteList.add(invoker);
                             }
                         } else {
+                            //总列表(与registry保持一致)中不存在, 移除
                             needDeleteList.add(invoker);
                         }
                     }
@@ -299,6 +312,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
                     // 3. recover valid invoker
                     for (Invoker<T> tInvoker : needDeleteList) {
                         if (invokers.contains(tInvoker)) {
+                            //已经重连成功加入总invokers列表的, 将其加入有效列表中
                             addValidInvoker(tInvoker);
                             logger.info("Recover service address: " + tInvoker.getUrl() + "  from invalid list.");
                         }
@@ -331,6 +345,7 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
 
     private synchronized void refreshInvokerInternal() {
         BitList<Invoker<T>> copiedInvokers = invokers.clone();
+        //以copiedInvokers为源, 刷新invokersToReconnect, disabledInvokers两个列表
         refreshInvokers(copiedInvokers, invokersToReconnect);
         refreshInvokers(copiedInvokers, disabledInvokers);
         validInvokers = copiedInvokers;
@@ -339,9 +354,11 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
     private void refreshInvokers(BitList<Invoker<T>> targetInvokers, Collection<Invoker<T>> invokersToRemove) {
         List<Invoker<T>> needToRemove = new LinkedList<>();
         for (Invoker<T> tInvoker : invokersToRemove) {
+            //总invoker集合中元素如果已经在要移除列表中, 那么从总集合中移除
             if (targetInvokers.contains(tInvoker)) {
                 targetInvokers.remove(tInvoker);
             } else {
+                //如果要移除的invoker不在总列表中, 那么直接从要移除列表中删除.
                 needToRemove.add(tInvoker);
             }
         }

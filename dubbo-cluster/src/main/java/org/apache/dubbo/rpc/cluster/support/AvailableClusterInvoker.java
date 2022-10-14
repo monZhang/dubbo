@@ -28,6 +28,7 @@ import java.util.List;
 /**
  * AvailableClusterInvoker
  *
+ *  基于可用性调用 不使用其他 lb 策略, 只要是拿到可用的invoker 既进行调用, 失败后抛出异常
  */
 public class AvailableClusterInvoker<T> extends AbstractClusterInvoker<T> {
 

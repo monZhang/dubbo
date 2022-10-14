@@ -481,6 +481,7 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
     @Override
     @SuppressWarnings("unchecked")
     public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
+        //获取注册中心
         url = getRegistryUrl(url);
         Registry registry = getRegistry(url);
         if (RegistryService.class.equals(type)) {
@@ -491,11 +492,15 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
         Map<String, String> qs = (Map<String, String>) url.getAttribute(REFER_KEY);
         String group = qs.get(GROUP_KEY);
         if (StringUtils.isNotEmpty(group)) {
+            //group配置多个或者全部的情况可能是同时访问多个接口合并结果的调用场景场景,
+            //直接使用MergeableCluster构建, 至于是不是真正的要访问多个provider并合并结果是在 MergeableClusterInvoker中判断
             if ((COMMA_SPLIT_PATTERN.split(group)).length > 1 || "*".equals(group)) {
-                return doRefer(Cluster.getCluster(url.getScopeModel(), MergeableCluster.NAME), registry, type, url, qs);
+                Cluster mergeableCluster = Cluster.getCluster(url.getScopeModel(), MergeableCluster.NAME);
+                return doRefer(mergeableCluster, registry, type, url, qs);
             }
         }
 
+        //默认使用FailoverCluster的集群容错策略, 这里spi加载时自动进行了一层包装, 最终得到的是MockClusterWrapper
         Cluster cluster = Cluster.getCluster(url.getScopeModel(), qs.get(CLUSTER_KEY));
         return doRefer(cluster, registry, type, url, qs);
     }
@@ -514,7 +519,15 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
             consumerAttribute
         );
         url = url.putAttribute(CONSUMER_URL_KEY, consumerUrl);
+
+        //dubbo支持服务级别的服务注册发现, 为了兼容以前接口级别的服务订阅引入MigrateInvoker作为中间纽带, 可以同事支持接口注册 服务注册,以及各自单独注册方便迁移
+        //创建MigrationInvoker, 这里什么都没做就是单纯的创建一个对象
+        //内部持有的最重要的两个invoker没有初始化 (invoker, ServiceDiscoveryInvoker)
         ClusterInvoker<T> migrationInvoker = getMigrationInvoker(this, cluster, registry, type, url, consumerUrl);
+
+        //加载监听器并使用监听器对migrationInvoker的状态,行为进行控制
+        //当前仅有 migrat
+        //初始化 invoker, serviceDiscoveryInvoker
         return interceptInvoker(migrationInvoker, url, consumerUrl);
     }
 
@@ -565,6 +578,7 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
         directory.setRegistry(registry);
         directory.setProtocol(protocol);
         // all attributes of REFER_KEY
+        //构建需要注册到注册中心的consumerUrl
         Map<String, String> parameters = new HashMap<>(directory.getConsumerUrl().getParameters());
         URL urlToRegistry = new ServiceConfigURL(
             parameters.get(PROTOCOL_KEY) == null ? CONSUMER : parameters.get(PROTOCOL_KEY),
@@ -575,13 +589,18 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
         );
         urlToRegistry = urlToRegistry.setScopeModel(directory.getConsumerUrl().getScopeModel());
         urlToRegistry = urlToRegistry.setServiceModel(directory.getConsumerUrl().getServiceModel());
+
         if (directory.isShouldRegister()) {
             directory.setRegisteredConsumerUrl(urlToRegistry);
+            //发起网络请求, 注册consumerUrl到注册中心
             registry.register(directory.getRegisteredConsumerUrl());
         }
-        directory.buildRouterChain(urlToRegistry);
-        directory.subscribe(toSubscribeUrl(urlToRegistry));
 
+        //构建routerChain并注入到 directory中
+        directory.buildRouterChain(urlToRegistry);
+        //订阅 providers,configurators,routers 节点目录下的所有注册信息
+        directory.subscribe(toSubscribeUrl(urlToRegistry));
+        //创建MockClusterInvoker, 将FailoverClusterInvoker封装到其中 ( FailoverClusterInvoker被 ClusterFilter包装了很多层 )
         return (ClusterInvoker<T>) cluster.join(directory, true);
     }
 

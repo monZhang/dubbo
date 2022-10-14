@@ -47,6 +47,8 @@ public class HeartbeatTimerTask extends AbstractTimerTask {
             Long now = now();
             if ((lastRead != null && now - lastRead > heartbeat)
                     || (lastWrite != null && now - lastWrite > heartbeat)) {
+                //当lastRead, lastWrite 更新超过60S(默认) 意味着60秒没有进行通信了, 这时候发送心跳( consumer-> provider 或者 provier -> consumer 心跳是双向的)给对应的端, 检测连接是否正常
+                //lastRead, lastWrite 在正常业务调用时也会跟着更新, 因此, 在业务繁忙时不发送心跳.
                 Request req = new Request();
                 req.setVersion(Version.getProtocolVersion());
                 req.setTwoWay(true);

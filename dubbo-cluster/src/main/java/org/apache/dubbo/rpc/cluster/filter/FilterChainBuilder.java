@@ -180,6 +180,7 @@ public interface FilterChainBuilder {
 
     class CallbackRegistrationInvoker<T, FILTER extends BaseFilter> implements Invoker<T> {
         static final Logger LOGGER = LoggerFactory.getLogger(CallbackRegistrationInvoker.class);
+        //CopyOfFilterChainNode
         final Invoker<T> filterInvoker;
         final List<FILTER> filters;
 
@@ -190,6 +191,7 @@ public interface FilterChainBuilder {
 
         @Override
         public Result invoke(Invocation invocation) throws RpcException {
+            //调用CopyOfFilterChainNode invoke方法
             Result asyncResult = filterInvoker.invoke(invocation);
             asyncResult.whenCompleteWithContext((r, t) -> {
                 for (int i = filters.size() - 1; i >= 0; i--) {
@@ -317,6 +319,9 @@ public interface FilterChainBuilder {
         public Result invoke(Invocation invocation) throws RpcException {
             Result asyncResult;
             try {
+                //将下一个节点传入本节点持有的filter中, 并执行本节点的filter过滤逻辑,
+                //当本节点持有的filter逻辑执行完成, 直接调用下一个节点的invoker( 内部又会执行其持有的filter )
+                //直到filter链全部执行完成.
                 InvocationProfilerUtils.enterDetailProfiler(invocation, () -> "Filter " + filter.getClass().getName() + " invoke.");
                 asyncResult = filter.invoke(nextNode, invocation);
             } catch (Exception e) {

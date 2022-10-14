@@ -50,8 +50,14 @@ public final class InternalThreadLocalMap {
     public static InternalThreadLocalMap get() {
         Thread thread = Thread.currentThread();
         if (thread instanceof InternalThread) {
+            //internalThread继承Thread其内部持有一个internalThreadLocalMap, 每个ThreadLocalMap 包含一个数组容器和一个ThreadLocal容器
+            //internalThreadLocal实例分别持有一个自己数据保存在 internalThreadLocalMap中的数组容器 中的index.
+            //internalThread数据获取时通过 internalThreadLocal中的index 到当前线程持有的internalThreadLocalMap 中的数组容器中获取数据
+
+            //通过每个internalThreadLocal持有其数据在数组中保存的位置避免了 jdk ThreadLocal写入时hash冲突导致的性能问题 (线性探测法)
             return fastGet((InternalThread) thread);
         }
+        //非internalThread底层使用ThreadLocal获取数据
         return slowGet();
     }
 
@@ -102,6 +108,9 @@ public final class InternalThreadLocalMap {
     }
 
     private InternalThreadLocalMap() {
+        //初始化一个数组并给每个元素赋值一个默认值
+        //初始化数组时需要结合全局计数器 NEXT_INDEX 计算数组长度,
+        //数组中index < NEXT_INDEX 的位置都被赋默认值后续不使用????
         indexedVariables = newIndexedVariableTable();
     }
 
@@ -120,6 +129,7 @@ public final class InternalThreadLocalMap {
             lookup[index] = value;
             return oldValue == UNSET;
         } else {
+            //超出现有数组容量时数组扩容
             expandIndexedVariableTableAndSet(index, value);
             return true;
         }
@@ -174,6 +184,7 @@ public final class InternalThreadLocalMap {
     }
 
     private static InternalThreadLocalMap fastGet(InternalThread thread) {
+        //获取当前线程持有的 internalThreadLocalMap, 如果没有就创建一个
         InternalThreadLocalMap threadLocalMap = thread.threadLocalMap();
         if (threadLocalMap == null) {
             thread.setThreadLocalMap(threadLocalMap = new InternalThreadLocalMap());

@@ -16,11 +16,14 @@
  */
 package org.apache.dubbo.demo.provider;
 
+import com.google.common.collect.Maps;
 import org.apache.dubbo.common.constants.CommonConstants;
 import org.apache.dubbo.config.*;
 import org.apache.dubbo.config.bootstrap.DubboBootstrap;
 import org.apache.dubbo.demo.DemoService;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 public class Application {

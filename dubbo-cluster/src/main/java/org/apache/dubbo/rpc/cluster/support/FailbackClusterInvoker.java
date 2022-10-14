@@ -47,11 +47,15 @@ import static org.apache.dubbo.rpc.cluster.Constants.FAIL_BACK_TASKS_KEY;
  * Especially useful for services of notification.
  *
  * <a href="http://en.wikipedia.org/wiki/Failback">Failback</a>
+ *
+ * 故障恢复策略, 当调用发生错误时创建延迟重试任务, 并返回一个空结果
+ * 延迟重试任务默认情况下 最大多重试3次, 每次间隔5s
  */
 public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
     private static final Logger logger = LoggerFactory.getLogger(FailbackClusterInvoker.class);
 
+    //失败重试间隔5s
     private static final long RETRY_FAILED_PERIOD = 5;
 
     /**
@@ -65,11 +69,12 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
     public FailbackClusterInvoker(Directory<T> directory) {
         super(directory);
-
+        //重试次数3次
         int retriesConfig = getUrl().getParameter(RETRIES_KEY, DEFAULT_FAILBACK_TIMES);
         if (retriesConfig < 0) {
             retriesConfig = DEFAULT_FAILBACK_TIMES;
         }
+        //最多同时存在100个重试任务, 超出后再次添加任务抛出异常
         int failbackTasksConfig = getUrl().getParameter(FAIL_BACK_TASKS_KEY, DEFAULT_FAILBACK_TASKS);
         if (failbackTasksConfig <= 0) {
             failbackTasksConfig = DEFAULT_FAILBACK_TASKS;
@@ -111,6 +116,7 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
             logger.error("Failback to invoke method " + invocation.getMethodName() + ", wait for retry in background. Ignored exception: "
                 + e.getMessage() + ", ", e);
             if (retries > 0) {
+                //调用失败, 将请求信息封装成延迟任务等待一段时间后重试
                 addFailed(loadbalance, invocation, invokers, invoker, consumerUrl);
             }
             return AsyncRpcResult.newDefaultAsyncResult(null, null, invocation); // ignore
@@ -170,6 +176,7 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 if ((++retriedTimes) >= retries) {
                     logger.error("Failed retry times exceed threshold (" + retries + "), We have to abandon, invocation->" + invocation);
                 } else {
+                    //重试失败&重试次数没有到达上限, 在次创建一个新的延迟任务
                     rePut(timeout);
                 }
             }

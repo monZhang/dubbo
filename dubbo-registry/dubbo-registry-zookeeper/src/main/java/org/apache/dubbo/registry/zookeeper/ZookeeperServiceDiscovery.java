@@ -33,10 +33,7 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.CuratorWatcher;
 import org.apache.zookeeper.KeeperException;
 
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
@@ -114,7 +111,12 @@ public class ZookeeperServiceDiscovery extends AbstractServiceDiscovery {
 
     @Override
     public List<ServiceInstance> getInstances(String serviceName) throws NullPointerException {
-        return doInServiceDiscovery(s -> build(registryURL, s.queryForInstances(serviceName)));
+        return doInServiceDiscovery(s -> {
+            //
+            Collection instances = s.queryForInstances(serviceName);
+            //
+            return build(registryURL, instances);
+        });
     }
 
     @Override

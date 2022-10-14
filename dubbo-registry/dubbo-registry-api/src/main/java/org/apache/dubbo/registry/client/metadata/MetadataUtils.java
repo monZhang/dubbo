@@ -74,6 +74,7 @@ public class MetadataUtils {
                             logger.info("Report of service definition is disabled for " + entry.getKey());
                             continue;
                         }
+                        //对元数据进行包装并保存 (上报到元数据中心并保存到本地文件缓存)
                         metadataReport.storeProviderMetadata(
                             new MetadataIdentifier(
                                 url.getServiceInterface(),
@@ -91,6 +92,7 @@ public class MetadataUtils {
                         logger.info("Report of service definition is disabled for " + entry.getKey());
                         continue;
                     }
+                    //对元数据进行包装并保存 (上报到元数据中心并保存到本地文件缓存)
                     metadataReport.storeConsumerMetadata(
                         new MetadataIdentifier(
                             url.getServiceInterface(),

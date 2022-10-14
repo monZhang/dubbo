@@ -87,6 +87,9 @@ public class NettyClient extends AbstractClient {
     public NettyClient(final URL url, final ChannelHandler handler) throws RemotingException {
         // you can customize name and type of client thread pool by THREAD_NAME_KEY and THREADPOOL_KEY in CommonConstants.
         // the handler will be wrapped: MultiMessageHandler->HeartbeatHandler->handler
+
+        //wrapChannelHandler方法 构建的handler链:
+        // MultiMessageHandler -> HeartbeatHandler -> AllChannelHandler -> decodeHandler -> HeaderExchangeHandler -> requestHandler
         super(url, wrapChannelHandler(url, handler));
     }
 
@@ -152,6 +155,7 @@ public class NettyClient extends AbstractClient {
         long start = System.currentTimeMillis();
         ChannelFuture future = bootstrap.connect(getConnectAddress());
         try {
+            //阻塞等待连接成功, 默认超时时间3s
             boolean ret = future.awaitUninterruptibly(getConnectTimeout(), MILLISECONDS);
 
             if (ret && future.isSuccess()) {
@@ -172,6 +176,7 @@ public class NettyClient extends AbstractClient {
                     }
                 } finally {
                     if (NettyClient.this.isClosed()) {
+                        //nettyClient已经关闭的情况, 新建立的channel也要关闭
                         try {
                             if (logger.isInfoEnabled()) {
                                 logger.info("Close new netty channel " + newChannel + ", because the client closed.");
@@ -182,6 +187,7 @@ public class NettyClient extends AbstractClient {
                             NettyChannel.removeChannelIfDisconnected(newChannel);
                         }
                     } else {
+                        // 跟新最新创建的channel到NettyClient
                         NettyClient.this.channel = newChannel;
                     }
                 }

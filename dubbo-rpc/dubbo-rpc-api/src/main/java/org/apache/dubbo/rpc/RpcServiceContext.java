@@ -58,8 +58,10 @@ public class RpcServiceContext extends RpcContext {
 
     private String remoteApplicationName;
 
+    //使用过的invoker列表
     @Deprecated
     private List<Invoker<?>> invokers;
+    //当前调用正在使用中的invoker, 调用完成立刻会被清理掉
     @Deprecated
     private Invoker<?> invoker;
     @Deprecated

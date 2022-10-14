@@ -83,6 +83,8 @@ public class DefaultFilterChainBuilder implements FilterChainBuilder {
         ClusterInvoker<T> last = originalInvoker;
         URL url = originalInvoker.getUrl();
         List<ModuleModel> moduleModels = getModuleModelsFromUrl(url);
+
+        //获取符合条件的所有 ClusterFilter
         List<ClusterFilter> filters;
         if (moduleModels != null && moduleModels.size() == 1) {
             filters = ScopeModelUtil.getExtensionLoader(ClusterFilter.class, moduleModels.get(0)).getActivateExtension(url, key, group);
@@ -101,11 +103,13 @@ public class DefaultFilterChainBuilder implements FilterChainBuilder {
         }
 
         if (!CollectionUtils.isEmpty(filters)) {
+            //构建ClusterFilter过滤器链
             for (int i = filters.size() - 1; i >= 0; i--) {
                 final ClusterFilter filter = filters.get(i);
                 final Invoker<T> next = last;
                 last = new CopyOfClusterFilterChainNode<>(originalInvoker, next, filter);
             }
+            //将过滤器链封装在 ClusterCallbackRegistrationInvoker中
             return new ClusterCallbackRegistrationInvoker<>(originalInvoker, last, filters);
         }
 

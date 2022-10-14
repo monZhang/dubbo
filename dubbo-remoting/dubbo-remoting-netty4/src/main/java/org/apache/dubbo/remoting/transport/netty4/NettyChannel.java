@@ -161,6 +161,8 @@ final class NettyChannel extends AbstractChannel {
         try {
             ChannelFuture future = channel.writeAndFlush(message);
             if (sent) {
+                //发送数据时是否等待发送写入完成, 默认sent=false异步直接返回
+                //写入默认超时时间1s
                 // wait timeout ms
                 timeout = getUrl().getPositiveParameter(TIMEOUT_KEY, DEFAULT_TIMEOUT);
                 success = future.await(timeout);

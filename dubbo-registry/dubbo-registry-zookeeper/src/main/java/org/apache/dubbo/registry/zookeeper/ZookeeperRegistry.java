@@ -80,13 +80,13 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
         this.root = group;
         //获取zk客户端, 并给他添加一个监听, 当
         this.zkClient = zookeeperTransporter.connect(url);
-        //对zk添加一个监听器, 当发生网络事件的时, 此监听器被回调.
+        //对zk添加一个监听器, 当有网络事件发生时, 此监听器被回调.
         this.zkClient.addStateListener((state) -> {
             if (state == StateListener.RECONNECTED) {
                 logger.warn("Trying to fetch the latest urls, in case there're provider changes during connection loss.\n" +
                     " Since ephemeral ZNode will not get deleted for a connection lose, " +
                     "there's no need to re-register url of this instance.");
-                //发生重连时, 拉取一次注册信息
+                //发生重连时, 拉取一次最新的注册信息
                 ZookeeperRegistry.this.fetchLatestAddresses();
             } else if (state == StateListener.NEW_SESSION_CREATED) {
                 logger.warn("Trying to re-register urls and re-subscribe listeners of this instance to registry...");
@@ -179,21 +179,25 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
                 CountDownLatch latch = new CountDownLatch(1);
                 try {
                     List<URL> urls = new ArrayList<>();
+                    //获取group下的所有目录 (providers,configurators,routers)
                     for (String path : toCategoriesPath(url)) {
-                        //创建一个监听器
+                        //为每个子接节点(providers,configurators,routers)创建监听器,  当path变动也就意味着有对应的provider上下线, 此时回调本地监听更新本地注册表信息.
                         ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.computeIfAbsent(url, k -> new ConcurrentHashMap<>());
                         ChildListener zkListener = listeners.computeIfAbsent(listener, k -> new RegistryChildListenerImpl(url, k, latch));
                         if (zkListener instanceof RegistryChildListenerImpl) {
                             ((RegistryChildListenerImpl) zkListener).setLatch(latch);
                         }
+
                         //如果节点path不存在那么就创建, 否则什么都不做.
                         zkClient.create(path, false);
-                        //对path目录添加监听, 当path变动也就意味着有对应的provider上下线, 此时回调本地监听更新本地注册表信息.
+
+                        //对path目录绑定监听器并拿到对应节点下的内容
                         List<String> children = zkClient.addChildListener(path, zkListener);
                         if (children != null) {
                             urls.addAll(toUrlsWithEmpty(url, path, children));
                         }
                     }
+                    //将订阅到的所有节点下的内容 ( 已被转换成 urls ), 发送通知更新本地注册缓存信息.
                     notify(url, listener, urls);
                 } finally {
                     // tells the listener to run only after the sync notification of main thread finishes.
@@ -276,6 +280,7 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
         }
         String[] paths = new String[categories.length];
         for (int i = 0; i < categories.length; i++) {
+            // path = group/interface/{providers,configurators,routers}
             paths[i] = toServicePath(url) + PATH_SEPARATOR + categories[i];
         }
         return paths;
@@ -303,6 +308,7 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
             for (Map.Entry<URL, Set<NotifyListener>> entry : recoverSubscribed.entrySet()) {
                 URL url = entry.getKey();
                 for (NotifyListener listener : entry.getValue()) {
+                    //移除 关于当前url相关的 订阅失败\退订失败的任务
                     removeFailedSubscribed(url, listener);
                     addFailedSubscribed(url, listener);
                 }
@@ -321,6 +327,7 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
 
         public RegistryChildListenerImpl(URL consumerUrl, NotifyListener listener, CountDownLatch latch) {
             this.latch = latch;
+            //创建zk通知器, 当监听被回调时, 通过zk通知器进行通知
             this.notifier = new ZookeeperRegistryNotifier(consumerUrl, listener, ZookeeperRegistry.this.getDelay());
         }
 
@@ -335,6 +342,7 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
             } catch (InterruptedException e) {
                 logger.warn("Zookeeper children listener thread was interrupted unexpectedly, may cause race condition with the main thread.");
             }
+            //使用zk通知器进行通知操作
             notifier.notify(path, children);
         }
     }

@@ -58,10 +58,11 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
         super(url, handler);
         // set default needReconnect true when channel is not connected
         needReconnect = url.getParameter(Constants.SEND_RECONNECT_KEY, true);
-
+        //创建一个CachedThreadPool
         initExecutor(url);
 
         try {
+            //开启网络服务器 - 客户端
             doOpen();
         } catch (Throwable t) {
             close();
@@ -71,7 +72,7 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
         }
 
         try {
-            // connect.
+            // connect. 创建连接
             connect();
             if (logger.isInfoEnabled()) {
                 logger.info("Start " + getClass().getSimpleName() + " " + NetUtils.getLocalAddress() + " connect to the server " + getRemoteAddress());
@@ -87,6 +88,7 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
                 return;
             }
 
+            //如果不检查服务提供者状态, 那么这吞掉异常, 打印一行日志, 直接返回, 等后续的重连任务进行重连操作
             if (url.getParameter(Constants.CHECK_KEY, true)) {
                 close();
                 throw t;
@@ -214,7 +216,7 @@ public abstract class AbstractClient extends AbstractEndpoint implements Client 
                     + NetUtils.getLocalHost() + " using dubbo version " + Version.getVersion() + ", cause: client status is closed or closing.");
                 return;
             }
-
+            //发起连接
             doConnect();
 
             if (!isConnected()) {

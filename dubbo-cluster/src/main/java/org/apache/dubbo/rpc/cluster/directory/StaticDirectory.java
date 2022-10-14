@@ -51,6 +51,8 @@ public class StaticDirectory<T> extends AbstractDirectory<T> {
         if (CollectionUtils.isEmpty(invokers)) {
             throw new IllegalArgumentException("invokers == null");
         }
+        //更新本地Invoker缓存
+        //  保存invoker集合到本地同时刷新重连列表,禁用列表两个缓存
         this.setInvokers(new BitList<>(invokers));
     }
 
@@ -105,6 +107,7 @@ public class StaticDirectory<T> extends AbstractDirectory<T> {
     protected List<Invoker<T>> doList(BitList<Invoker<T>> invokers, Invocation invocation) throws RpcException {
         if (routerChain != null) {
             try {
+                //直接对所有的invokers进行路由, 这里的invokers是一个静态列表不会随时发生变化
                 List<Invoker<T>> finalInvokers = routerChain.route(getConsumerUrl(), invokers, invocation);
                 return finalInvokers == null ? BitList.emptyList() : finalInvokers;
             } catch (Throwable t) {

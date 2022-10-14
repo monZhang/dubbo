@@ -299,11 +299,15 @@ public abstract class AbstractMetadataReport implements MetadataReport {
             if (logger.isInfoEnabled()) {
                 logger.info("store consumer metadata. Identifier : " + consumerMetadataIdentifier + "; definition: " + serviceParameterMap);
             }
+            //元数据记录加入到总缓存记录, 并从上报失败的列表中移除( 这里要进行上报, 如果之前上报失败过那么就从失败列表移除并进行上报 )
             allMetadataReports.put(consumerMetadataIdentifier, serviceParameterMap);
             failedReports.remove(consumerMetadataIdentifier);
 
+            //将元数据信息转换成json形式
             String data = JsonUtils.getJson().toJson(serviceParameterMap);
+            //上报到元数据中心
             doStoreConsumerMetadata(consumerMetadataIdentifier, data);
+            //保存到本地文件中
             saveProperties(consumerMetadataIdentifier, data, true, !syncReport);
         } catch (Exception e) {
             // retry again. If failed again, throw exception.

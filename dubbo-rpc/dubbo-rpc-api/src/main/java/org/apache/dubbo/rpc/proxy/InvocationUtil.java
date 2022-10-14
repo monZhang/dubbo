@@ -39,6 +39,7 @@ public class InvocationUtil {
         rpcInvocation.setTargetServiceUniqueName(serviceKey);
 
         // invoker.getUrl() returns consumer url.
+        //创建 RpcServiceContext 保存到当前线程中(使用自己构建的threadLocal) 并保存consumerUrl信息
         RpcServiceContext.getServiceContext().setConsumerUrl(url);
 
         if (ProfilerSwitch.isEnableSimpleProfiler()) {
@@ -52,18 +53,20 @@ public class InvocationUtil {
             }
             rpcInvocation.put(Profiler.PROFILER_KEY, bizProfiler);
             try {
+                //执行服务调用, 并对返回的结果进行处理
                 return invoker.invoke(rpcInvocation).recreate();
             } finally {
                 Profiler.release(bizProfiler);
+                //todo: 超时时间的获取以服务端为准 ???
                 int timeout;
                 Object timeoutKey = rpcInvocation.getObjectAttachmentWithoutConvert(TIMEOUT_KEY);
                 if (timeoutKey instanceof Integer) {
                     timeout = (Integer) timeoutKey;
                 } else {
-                    timeout = url.getMethodPositiveParameter(rpcInvocation.getMethodName(),
-                        TIMEOUT_KEY,
-                        DEFAULT_TIMEOUT);
+                    //获取方法的超时时间, 默认1s
+                    timeout = url.getMethodPositiveParameter(rpcInvocation.getMethodName(), TIMEOUT_KEY, DEFAULT_TIMEOUT);
                 }
+                //判断一下invoker执行是否超时, 如果超时那么就打印一行警告日志.
                 long usage = bizProfiler.getEndTime() - bizProfiler.getStartTime();
                 if ((usage / (1000_000L * ProfilerSwitch.getWarnPercent())) > timeout) {
                     StringBuilder attachment = new StringBuilder();
@@ -83,6 +86,7 @@ public class InvocationUtil {
                 }
             }
         }
+        //无探查器情况直接调用
         return invoker.invoke(rpcInvocation).recreate();
     }
 }

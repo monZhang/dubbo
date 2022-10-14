@@ -417,7 +417,8 @@ public class DubboProtocol extends AbstractProtocol {
         optimizeSerialization(url);
 
         // create rpc invoker.
-        DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, getClients(url), invokers);
+        ExchangeClient[] exchangeClients = getClients(url);
+        DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, exchangeClients, invokers);
         invokers.add(invoker);
 
         return invoker;
@@ -449,6 +450,7 @@ public class DubboProtocol extends AbstractProtocol {
                 clients[i] = shareClients.get(i);
 
             } else {
+                //创建ExchangeClient
                 clients[i] = initClient(url);
             }
         }
@@ -507,7 +509,7 @@ public class DubboProtocol extends AbstractProtocol {
             connectNum = Math.max(connectNum, 1);
 
             // If the clients is empty, then the first initialization is
-            if (CollectionUtils.isEmpty(typedClients)) {
+            if (CollectionUtils.isEmpty(typedClients)) { //创建ExchangeClient
                 typedClients = buildReferenceCountExchangeClientList(url, connectNum);
             } else {
                 for (int i = 0; i < typedClients.size(); i++) {

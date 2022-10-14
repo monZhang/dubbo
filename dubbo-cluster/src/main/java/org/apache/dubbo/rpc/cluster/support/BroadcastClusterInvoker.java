@@ -57,6 +57,7 @@ public class BroadcastClusterInvoker<T> extends AbstractClusterInvoker<T> {
         // The value range of broadcast.fail.threshold must be 0～100.
         // 100 means that an exception will be thrown last, and 0 means that as long as an exception occurs, it will be thrown.
         // see https://github.com/apache/dubbo/pull/7174
+        //失败百分比, 失败率超过该百分比不在进行后续广播, 默认 100
         int broadcastFailPercent = url.getParameter(BROADCAST_FAIL_PERCENT_KEY, MAX_BROADCAST_FAIL_PERCENT);
 
         if (broadcastFailPercent < MIN_BROADCAST_FAIL_PERCENT || broadcastFailPercent > MAX_BROADCAST_FAIL_PERCENT) {
@@ -79,6 +80,7 @@ public class BroadcastClusterInvoker<T> extends AbstractClusterInvoker<T> {
                         logger.warn(exception.getMessage(), exception);
                         failIndex++;
                         if (failIndex == failThresholdIndex) {
+                            //失败率达到阈值, 不在进行后续广播
                             break;
                         }
                     }
@@ -88,6 +90,7 @@ public class BroadcastClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 logger.warn(exception.getMessage(), exception);
                 failIndex++;
                 if (failIndex == failThresholdIndex) {
+                    //失败率达到阈值, 不在进行后续广播
                     break;
                 }
             }
@@ -106,6 +109,7 @@ public class BroadcastClusterInvoker<T> extends AbstractClusterInvoker<T> {
                         failThresholdIndex, failIndex));
                 }
             }
+            //如果广播过程中有异常情况发生, 最后一次异常信息被最终抛出
             throw exception;
         }
 

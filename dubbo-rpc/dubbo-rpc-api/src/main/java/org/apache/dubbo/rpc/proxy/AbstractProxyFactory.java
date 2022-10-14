@@ -72,6 +72,7 @@ public abstract class AbstractProxyFactory implements ProxyFactory {
 
         Class<?> realInterfaceClass = null;
         if (generic) {
+            //泛化调用场景
             try {
                 // find the real interface from url
                 String realInterface = invoker.getUrl().getParameter(Constants.INTERFACE);
@@ -90,6 +91,8 @@ public abstract class AbstractProxyFactory implements ProxyFactory {
         interfaces.addAll(Arrays.asList(INTERNAL_INTERFACES));
 
         try {
+            //使用javassist/jdk动态代理 创建代理对象
+            //invoker 被封装成InvocationHandler的子类 InvokerInvocationHandler
             return getProxy(invoker, interfaces.toArray(new Class<?>[0]));
         } catch (Throwable t) {
             if (generic) {

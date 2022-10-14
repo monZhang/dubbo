@@ -86,15 +86,20 @@ public class TagStateRouter<T> extends AbstractStateRouter<T> implements Configu
             return invokers;
         }
 
+        // 1. 静态tag路由
         // since the rule can be changed by config center, we should copy one to use.
         final TagRouterRule tagRouterRuleCopy = tagRouterRule;
         if (tagRouterRuleCopy == null || !tagRouterRuleCopy.isValid() || !tagRouterRuleCopy.isEnabled()) {
             if (needToPrintMessage) {
                 messageHolder.set("Disable Tag Router. Reason: tagRouterRule is invalid or disabled");
             }
+            //过滤条件
+            // 1.1.tag完全匹配 (tag不存在也是一种过滤条件)
+            // 1.2.tag匹配失败&&不是强制tag路由时, 返回没有tag的invoker
             return filterUsingStaticTag(invokers, url, invocation);
         }
 
+        //2. 动态tag路由
         BitList<Invoker<T>> result = invokers;
         String tag = StringUtils.isEmpty(invocation.getAttachment(TAG_KEY)) ? url.getParameter(TAG_KEY) :
             invocation.getAttachment(TAG_KEY);
@@ -104,6 +109,7 @@ public class TagStateRouter<T> extends AbstractStateRouter<T> implements Configu
             List<String> addresses = tagRouterRuleCopy.getTagnameToAddresses().get(tag);
             // filter by dynamic tag group first
             if (CollectionUtils.isNotEmpty(addresses)) {
+                // 2.1.1. 动态路由中指定了地址, 那么地址需要和动态路由中配置相同
                 result = filterInvoker(invokers, invoker -> addressMatches(invoker.getUrl(), addresses));
                 // if result is not null OR it's null but force=true, return result directly
                 if (CollectionUtils.isNotEmpty(result) || tagRouterRuleCopy.isForce()) {
@@ -113,6 +119,7 @@ public class TagStateRouter<T> extends AbstractStateRouter<T> implements Configu
                     return result;
                 }
             } else {
+                // 2.1.2. 动态路由中没有指定地址, 那么使用tag判断
                 // dynamic tag group doesn't have any item about the requested app OR it's null after filtered by
                 // dynamic tag group but force=false. check static tag
                 result = filterInvoker(invokers, invoker -> tag.equals(invoker.getUrl().getParameter(TAG_KEY)));
@@ -127,6 +134,7 @@ public class TagStateRouter<T> extends AbstractStateRouter<T> implements Configu
             }
             // FAILOVER: return all Providers without any tags.
             else {
+                // 2.1.3.动态路由tag过滤结果为空, 降级将没有tag, 地址不配置的invoker 选出来
                 BitList<Invoker<T>> tmp = filterInvoker(invokers, invoker -> addressNotMatches(invoker.getUrl(),
                     tagRouterRuleCopy.getAddresses()));
                 if (needToPrintMessage) {
@@ -135,10 +143,12 @@ public class TagStateRouter<T> extends AbstractStateRouter<T> implements Configu
                 return filterInvoker(tmp, invoker -> StringUtils.isEmpty(invoker.getUrl().getParameter(TAG_KEY)));
             }
         } else {
+            //调用参数不指定tag情况 使用 2.1, 2.2 综合判断
             // List<String> addresses = tagRouterRule.filter(providerApp);
             // return all addresses in dynamic tag group.
             List<String> addresses = tagRouterRuleCopy.getAddresses();
             if (CollectionUtils.isNotEmpty(addresses)) {
+                //2.2.1. 动态路由中指定了地址那么invoker地址需要不在动态路由策略中, 动态路由中未指定地址那么都满足
                 result = filterInvoker(invokers, invoker -> addressNotMatches(invoker.getUrl(), addresses));
                 // 1. all addresses are in dynamic tag group, return empty list.
                 if (CollectionUtils.isEmpty(result)) {
@@ -153,6 +163,7 @@ public class TagStateRouter<T> extends AbstractStateRouter<T> implements Configu
             if (needToPrintMessage) {
                 messageHolder.set("filter using the static tag group");
             }
+            //2.2.2. invoker需要满足没有tag或者tag不在指定列表中
             return filterInvoker(result, invoker -> {
                 String localTag = invoker.getUrl().getParameter(TAG_KEY);
                 return StringUtils.isEmpty(localTag) || !tagRouterRuleCopy.getTagNames().contains(localTag);
@@ -181,11 +192,14 @@ public class TagStateRouter<T> extends AbstractStateRouter<T> implements Configu
             invocation.getAttachment(TAG_KEY);
         // Tag request
         if (!StringUtils.isEmpty(tag)) {
+            //1.参数有tag, 进行tag匹配 (String.equals)
             result = filterInvoker(invokers, invoker -> tag.equals(invoker.getUrl().getParameter(TAG_KEY)));
+            //根据tag匹配不到且不是强制走tag路由, 那么降级将没有tag标签的invoker筛选出来
             if (CollectionUtils.isEmpty(result) && !isForceUseTag(invocation)) {
                 result = filterInvoker(invokers, invoker -> StringUtils.isEmpty(invoker.getUrl().getParameter(TAG_KEY)));
             }
         } else {
+            //参数中没有tag, 那么invoker也需要没有tag
             result = filterInvoker(invokers, invoker -> StringUtils.isEmpty(invoker.getUrl().getParameter(TAG_KEY)));
         }
         return result;
@@ -208,9 +222,11 @@ public class TagStateRouter<T> extends AbstractStateRouter<T> implements Configu
 
     private <T> BitList<Invoker<T>> filterInvoker(BitList<Invoker<T>> invokers, Predicate<Invoker<T>> predicate) {
         if (invokers.stream().allMatch(predicate)) {
+            //全部满足条件, 直接返回
             return invokers;
         }
 
+        //过滤掉不满足条件的部分invoker
         BitList<Invoker<T>> newInvokers = invokers.clone();
         newInvokers.removeIf(invoker -> !predicate.test(invoker));
 

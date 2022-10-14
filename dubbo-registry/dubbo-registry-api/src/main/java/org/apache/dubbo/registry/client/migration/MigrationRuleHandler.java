@@ -54,6 +54,7 @@ public class MigrationRuleHandler<T> {
             logger.error("Failed to get step and threshold info from rule: " + rule, e);
         }
 
+        //对MigrationInvoker持有的invoker, ServerDiscoveryInvoker进行初始化.
         if (refreshInvoker(step, threshold, rule)) {
             // refresh success, update rule
             setMigrationRule(rule);
@@ -70,12 +71,15 @@ public class MigrationRuleHandler<T> {
             boolean success = true;
             switch (step) {
                 case APPLICATION_FIRST:
+                    //应用级服务注册发现优先, 但是也会使用接口级订阅
                     migrationInvoker.migrateToApplicationFirstInvoker(newRule);
                     break;
                 case FORCE_APPLICATION:
+                    //强制使用应用级
                     success = migrationInvoker.migrateToForceApplicationInvoker(newRule);
                     break;
                 case FORCE_INTERFACE:
+                    //默认,强制使用接口级注册发现
                 default:
                     success = migrationInvoker.migrateToForceInterfaceInvoker(newRule);
             }
